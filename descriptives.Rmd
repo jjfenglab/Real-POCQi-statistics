@@ -1,0 +1,268 @@
+---
+title: "OpenEvidence Pilot: Descriptive Statistics & Win Rates"
+author: "Jean"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+```
+
+# Load data
+
+```{r load}
+data_dir <- "pilot_data"
+
+assignments <- read_csv(file.path(data_dir, "qa_assignments.csv"))
+questions   <- read_csv(file.path(data_dir, "qa_questions.csv"))
+ratings     <- read_csv(file.path(data_dir, "ratings.csv"))
+users       <- read_csv(file.path(data_dir, "users.csv"))
+```
+
+# Mask vendor identities
+
+All vendor names are replaced with masked labels (A, B, C, D) for the
+remainder of the analysis. The mapping is intentionally scrambled and lives
+only in this chunk.
+
+```{r mask}
+vendor_mapping <- c(
+  "gpt-5.5"        = "A",
+  "openevidence"   = "B",
+  "claude-opus-4-8"= "C",
+  "gemini-3.1-pro" = "D"
+)
+
+mask_vendor <- function(x) unname(vendor_mapping[x])
+
+assignments <- assignments %>%
+  mutate(
+    slot_a_vendor = mask_vendor(slot_a_provider),
+    slot_b_vendor = mask_vendor(slot_b_provider)
+  ) %>%
+  select(-slot_a_provider, -slot_b_provider)
+```
+
+# Build the analytic dataset
+
+Join ratings to assignments, attach question specialty, and decode the
+choice into a winner (vendor in slot A, vendor in slot B, or tie).
+
+```{r analytic}
+qa_ratings <- ratings %>%
+  filter(!is.na(qa_assignment_id)) %>%
+  inner_join(
+    assignments %>%
+      select(assignment_id = id, user_id, question_id,
+             slot_a_vendor, slot_b_vendor, completed_at),
+    by = c("qa_assignment_id" = "assignment_id")
+  ) %>%
+  inner_join(
+    questions %>% select(question_id = id, specialty),
+    by = "question_id"
+  ) %>%
+  mutate(
+    winner = case_when(
+      choice %in% c("strongly_a", "slightly_a") ~ slot_a_vendor,
+      choice %in% c("strongly_b", "slightly_b") ~ slot_b_vendor,
+      choice == "tie" ~ NA_character_
+    ),
+    loser = case_when(
+      choice %in% c("strongly_a", "slightly_a") ~ slot_b_vendor,
+      choice %in% c("strongly_b", "slightly_b") ~ slot_a_vendor,
+      choice == "tie" ~ NA_character_
+    ),
+    is_tie = choice == "tie"
+  )
+```
+
+# Table 1: Cohort summary
+
+```{r table1}
+completed_assignments <- assignments %>% filter(!is.na(completed_at))
+
+n_questions_total  <- n_distinct(questions$id)
+n_questions_used   <- n_distinct(qa_ratings$question_id)
+n_graders_assigned <- n_distinct(assignments$user_id)
+n_graders_rated    <- n_distinct(qa_ratings$user_id)
+n_specialties      <- n_distinct(questions$specialty)
+
+per_user_completed <- completed_assignments %>%
+  count(user_id, name = "n_completed")
+
+avg_completed_per_user <- per_user_completed %>%
+  summarise(
+    mean_n = mean(n_completed),
+    sd_n   = sd(n_completed),
+    median_n = median(n_completed),
+    min_n = min(n_completed),
+    max_n = max(n_completed)
+  )
+
+table1 <- tibble(
+  Metric = c(
+    "Total questions in question bank",
+    "Questions used in pilot (≥1 rating)",
+    "Specialties represented",
+    "Graders assigned ≥1 question",
+    "Graders who submitted ≥1 rating",
+    "Completed assignments per grader (mean ± SD)",
+    "Completed assignments per grader (median [min, max])"
+  ),
+  Value = c(
+    n_questions_total,
+    n_questions_used,
+    n_specialties,
+    n_graders_assigned,
+    n_graders_rated,
+    sprintf("%.1f ± %.1f",
+            avg_completed_per_user$mean_n,
+            avg_completed_per_user$sd_n),
+    sprintf("%d [%d, %d]",
+            as.integer(avg_completed_per_user$median_n),
+            as.integer(avg_completed_per_user$min_n),
+            as.integer(avg_completed_per_user$max_n))
+  )
+)
+
+kable(table1, caption = "Table 1. Pilot cohort summary.") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+## Questions per specialty
+
+```{r specialty}
+questions %>%
+  count(specialty, name = "n_questions") %>%
+  arrange(desc(n_questions)) %>%
+  mutate(pct = sprintf("%.1f%%", 100 * n_questions / sum(n_questions))) %>%
+  kable(caption = "Number of questions per specialty (full question bank).") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+```{r specialty_used}
+qa_ratings %>%
+  distinct(question_id, specialty) %>%
+  count(specialty, name = "n_questions_rated") %>%
+  arrange(desc(n_questions_rated)) %>%
+  kable(caption = "Number of rated questions per specialty (pilot).") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+# Win-rate tables
+
+For every (assignment, axis) row we know which two vendors were compared
+and the chosen winner. The matrix below reports, for each ordered pair
+(row vendor vs. column vendor), the row vendor's win rate across all
+axes. Ties are reported separately.
+
+## Win-rate matrix
+
+```{r winrate_matrix}
+directed <- qa_ratings %>%
+  filter(!is_tie) %>%
+  transmute(row_vendor = winner, col_vendor = loser) %>%
+  bind_rows(
+    qa_ratings %>%
+      filter(!is_tie) %>%
+      transmute(row_vendor = loser, col_vendor = winner, .lost = TRUE)
+  )
+
+vendor_levels <- sort(unique(c(qa_ratings$slot_a_vendor, qa_ratings$slot_b_vendor)))
+
+win_matrix <- qa_ratings %>%
+  filter(!is_tie) %>%
+  mutate(
+    row_vendor = slot_a_vendor,
+    col_vendor = slot_b_vendor,
+    row_win = winner == slot_a_vendor
+  ) %>%
+  bind_rows(
+    qa_ratings %>%
+      filter(!is_tie) %>%
+      mutate(
+        row_vendor = slot_b_vendor,
+        col_vendor = slot_a_vendor,
+        row_win = winner == slot_b_vendor
+      )
+  ) %>%
+  group_by(row_vendor, col_vendor) %>%
+  summarise(
+    n = n(),
+    wins = sum(row_win),
+    win_rate = wins / n,
+    .groups = "drop"
+  ) %>%
+  mutate(cell = sprintf("%.1f%% (%d/%d)", 100 * win_rate, wins, n)) %>%
+  select(row_vendor, col_vendor, cell) %>%
+  pivot_wider(names_from = col_vendor, values_from = cell, values_fill = "—") %>%
+  arrange(row_vendor)
+
+kable(
+  win_matrix,
+  caption = "Row vendor's win rate vs. column vendor (ties excluded). Cell = win% (wins / non-tie comparisons)."
+) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+## Win-rate matrices per axis
+
+Same construction as the pooled matrix, repeated within each rating axis.
+
+```{r winrate_matrix_per_axis, results='asis'}
+build_win_matrix <- function(df) {
+  df %>%
+    filter(!is_tie) %>%
+    mutate(
+      row_vendor = slot_a_vendor,
+      col_vendor = slot_b_vendor,
+      row_win = winner == slot_a_vendor
+    ) %>%
+    bind_rows(
+      df %>%
+        filter(!is_tie) %>%
+        mutate(
+          row_vendor = slot_b_vendor,
+          col_vendor = slot_a_vendor,
+          row_win = winner == slot_b_vendor
+        )
+    ) %>%
+    group_by(row_vendor, col_vendor) %>%
+    summarise(
+      n = n(),
+      wins = sum(row_win),
+      win_rate = wins / n,
+      .groups = "drop"
+    ) %>%
+    mutate(cell = sprintf("%.1f%% (%d/%d)", 100 * win_rate, wins, n)) %>%
+    select(row_vendor, col_vendor, cell) %>%
+    pivot_wider(names_from = col_vendor, values_from = cell, values_fill = "—") %>%
+    arrange(row_vendor)
+}
+
+axes <- sort(unique(qa_ratings$axis))
+
+for (ax in axes) {
+  cat(sprintf("\n\n### Axis: %s\n\n", ax))
+  mat <- build_win_matrix(qa_ratings %>% filter(axis == ax))
+  print(
+    kable(
+      mat,
+      caption = sprintf(
+        "Row vendor's win rate vs. column vendor on axis = %s (ties excluded).",
+        ax
+      )
+    ) %>%
+      kable_styling(full_width = FALSE,
+                    bootstrap_options = c("striped", "hover"))
+  )
+}
+```
