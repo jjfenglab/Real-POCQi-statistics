@@ -134,7 +134,10 @@ subversion_summary <- paste(
   collapse = "; "
 )
 
+users_with_ratings <- unique(qa_ratings$user_id)
+
 per_user_rate <- users %>%
+  filter(id %in% users_with_ratings) %>%
   left_join(per_user_completed, by = c("id" = "user_id")) %>%
   mutate(
     n_completed = coalesce(n_completed, 0L),
@@ -355,6 +358,118 @@ for (sv in subversions) {
       caption = sprintf(
         paste0("Row vendor's win rate vs. column vendor for ",
                "rendering mode = %s (ties excluded)."),
+        sv
+      )
+    ) %>%
+      kable_styling(full_width = FALSE,
+                    bootstrap_options = c("striped", "hover"))
+  )
+}
+```
+
+# Win-margin tables
+
+Same row-vs-column structure as the win-rate matrices, but each cell is
+the mean number of Likert units the row vendor beat the column vendor
+by. The Likert scale is `strongly_*` = 2 units, `slightly_*` = 1 unit,
+`tie` = 0 units. Ties are *included* (they contribute 0 units). Cells
+are mirrored: `cell[row, col] = -cell[col, row]`. Cell format:
+`mean (net/N)` where `net` is the signed sum of units across all
+comparisons in that cell.
+
+```{r margin_helpers}
+likert_units_a <- function(choice) {
+  case_when(
+    choice == "strongly_a" ~  2,
+    choice == "slightly_a" ~  1,
+    choice == "tie"        ~  0,
+    choice == "slightly_b" ~ -1,
+    choice == "strongly_b" ~ -2
+  )
+}
+
+build_margin_matrix <- function(df) {
+  df %>%
+    mutate(units_a = likert_units_a(choice)) %>%
+    transmute(
+      row_vendor = slot_a_vendor,
+      col_vendor = slot_b_vendor,
+      row_units  = units_a
+    ) %>%
+    bind_rows(
+      df %>%
+        mutate(units_a = likert_units_a(choice)) %>%
+        transmute(
+          row_vendor = slot_b_vendor,
+          col_vendor = slot_a_vendor,
+          row_units  = -units_a
+        )
+    ) %>%
+    group_by(row_vendor, col_vendor) %>%
+    summarise(
+      n = n(),
+      net_units  = sum(row_units),
+      mean_units = net_units / n,
+      .groups = "drop"
+    ) %>%
+    mutate(cell = sprintf("%+.2f (%+d/%d)",
+                          mean_units,
+                          as.integer(net_units),
+                          n)) %>%
+    select(row_vendor, col_vendor, cell) %>%
+    pivot_wider(names_from = col_vendor, values_from = cell,
+                values_fill = "—") %>%
+    arrange(row_vendor)
+}
+```
+
+## Win-margin matrix
+
+```{r margin_matrix}
+kable(
+  build_margin_matrix(qa_ratings),
+  caption = paste0(
+    "Mean Likert-unit margin the row vendor won by vs. the column ",
+    "vendor (ties included as 0). Cell = mean (net/N)."
+  )
+) %>%
+  kable_styling(full_width = FALSE,
+                bootstrap_options = c("striped", "hover"))
+```
+
+## Win-margin matrices per axis
+
+```{r margin_matrix_per_axis, results='asis'}
+for (ax in axes) {
+  cat(sprintf("\n\n### Axis: %s\n\n", ax))
+  mat <- build_margin_matrix(qa_ratings %>% filter(axis == ax))
+  print(
+    kable(
+      mat,
+      caption = sprintf(
+        paste0("Mean Likert-unit margin row vendor won by vs. column ",
+               "vendor on axis = %s (ties included)."),
+        ax
+      )
+    ) %>%
+      kable_styling(full_width = FALSE,
+                    bootstrap_options = c("striped", "hover"))
+  )
+}
+```
+
+## Win-margin matrices per rendering mode
+
+```{r margin_matrix_per_subversion, results='asis'}
+for (sv in subversions) {
+  cat(sprintf("\n\n### Rendering mode: %s\n\n", sv))
+  mat <- build_margin_matrix(qa_ratings %>% filter(subversion == sv))
+  print(
+    kable(
+      mat,
+      caption = sprintf(
+        paste0("Mean Likert-unit margin row vendor won by vs. column ",
+               "vendor for rendering mode = %s (ties included)."),
         sv
       )
     ) %>%
