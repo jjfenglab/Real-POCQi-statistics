@@ -14,49 +14,69 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(knitr)
 library(kableExtra)
+
+source("favorability_test.R")
 ```
 
-```{r}
-simulate_null_data <- function(n_obs, null_dist){
-    # TODO: sample n_obs questions, where the wins, ties, and losses are sampled from the null_distribution
-    # return num samples with wins, ties, and losses (3-dim vector)
-}
-```
+# Sample Size Calculations
 
-```{r}
-get_favorability_score <- function(empirical_dist) {
-    return (empirical_dist[1] - empirical_dist[3])/sum(empirical_dist)
-}
-```
+Target: 90% power at α = 0.05
 
-```{r}
-run_favorability_test <- function(empirical_dist, n_boot_obs=100){
-    obs_fave = get_favorability_score(empirical_dist)
+```{r sample_size_calc, cache=TRUE}
+set.seed(123)
 
-    n_obs <- sum(empirical_dist)
-    null_distribution <- c(
-        (empirical_dist[1] + empirical_dist[3])/2, # equalized rate of wins
-        empirical_dist[2], # rate of ties
-        (empirical_dist[1] + empirical_dist[3])/2  # equalized rate of losses
-    )/n_obs
-
-    all_null_faves = c()
-    for (b in 1:n_boot_obs) {
-        null_dist = simulate_null_data(n_obs, null_distribution)
-        null_fave = get_favorability_score(null_dist)
-        all_null_faves = c(all_null_faves, null_fave)
-    }
-    p_val = mean(abs(all_null_faves) > abs(obs_fave))
-    return p_val
-}
-```
-
-```{r}
-# TODO: get sample size calculations
-num_replicates <- 100
 alt_distribution <- c(
-    0.65, # rate of wins
-    0.2, # rate of ties
-    0.15  # rate of losses
+  0.65,
+  0.20,
+  0.15
 )
+
+sample_sizes <- seq(20, 200, by = 20)
+num_replicates <- 500
+n_boot <- 1000
+alpha <- 0.05
+target_power <- 0.90
+
+powers <- sapply(sample_sizes, function(n) {
+  calc_power(n, alt_distribution, alpha = alpha,
+             num_replicates = num_replicates, n_boot = n_boot)
+})
+
+power_results <- tibble(
+  n = sample_sizes,
+  power = powers
+)
+
+power_results %>%
+  kable(caption = "Power by sample size (D = 0.50 under alternative)") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+```{r power_plot}
+ggplot(power_results, aes(x = n, y = power)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_hline(yintercept = target_power, linetype = "dashed", color = "red") +
+  scale_y_continuous(limits = c(0, 1), labels = scales::percent) +
+  labs(
+    x = "Sample size (number of comparisons)",
+    y = "Power",
+    title = "Power curve for favorability score test",
+    subtitle = sprintf("Alternative: D = %.2f, α = %.2f, target = %.0f%%",
+                       alt_distribution[1] - alt_distribution[3], alpha, 100 * target_power)
+  ) +
+  theme_minimal()
+```
+
+```{r min_sample_size}
+min_n <- power_results %>%
+  filter(power >= target_power) %>%
+  slice_min(n) %>%
+  pull(n)
+
+if (length(min_n) == 0) {
+  cat("Target power not achieved in tested range. Increase maximum sample size.\n")
+} else {
+  cat(sprintf("Minimum sample size for %.0f%% power: n = %d\n", 100 * target_power, min_n))
+}
 ```

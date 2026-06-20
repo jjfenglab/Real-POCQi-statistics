@@ -16,6 +16,8 @@ library(knitr)
 library(kableExtra)
 library(lme4)
 library(broom.mixed)
+
+source("favorability_test.R")
 ```
 
 # Load data
