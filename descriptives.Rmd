@@ -482,3 +482,64 @@ for (sv in subversions) {
   )
 }
 ```
+
+# Favorability Score Tests
+
+One-vs-rest favorability score test for each vendor on the clinical_utility
+axis, restricted to the text-only rendering condition. Bootstrap resamples
+questions as clusters.
+
+```{r favorability_test}
+set.seed(42)
+
+text_only_clinical <- qa_ratings %>%
+  filter(subversion == "qa_text_only", axis == "clinical_utility")
+
+vendors <- sort(unique(c(text_only_clinical$slot_a_vendor,
+                         text_only_clinical$slot_b_vendor)))
+
+prepare_one_vs_rest_df <- function(df, vendor) {
+  involving_vendor <- df %>%
+    filter(slot_a_vendor == vendor | slot_b_vendor == vendor) %>%
+    mutate(
+      outcome = case_when(
+        winner == vendor ~ 1L,
+        loser == vendor ~ -1L,
+        is_tie ~ 0L
+      )
+    ) %>%
+    select(question_id, outcome)
+
+  involving_vendor
+}
+
+favorability_results <- map_dfr(vendors, function(v) {
+  test_df <- prepare_one_vs_rest_df(text_only_clinical, v)
+
+  wins <- sum(test_df$outcome == 1)
+  ties <- sum(test_df$outcome == 0)
+  losses <- sum(test_df$outcome == -1)
+  n <- nrow(test_df)
+
+  fav_score <- get_favorability_score(test_df$outcome)
+  p_val <- run_favorability_test(test_df, n_boot = 2000)
+
+  tibble(
+    vendor = v,
+    wins = wins,
+    ties = ties,
+    losses = losses,
+    n = n,
+    favorability = fav_score,
+    p_value = p_val
+  )
+})
+
+favorability_results %>%
+  mutate(
+    favorability = sprintf("%.1f%%", 100 * favorability),
+    p_value = sprintf("%.4f", p_value)
+  ) %>%
+  kable(caption = "One-vs-rest favorability score test (text-only, clinical utility axis)") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```

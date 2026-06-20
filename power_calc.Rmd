@@ -22,6 +22,11 @@ source("favorability_test.R")
 
 Target: 90% power at α = 0.05
 
+Note: `n` here represents the number of questions (the unit of resampling in
+the cluster bootstrap). This assumes one comparison per question. If multiple
+raters evaluate the same question, the effective sample size is closer to the
+number of questions than the total number of ratings.
+
 ```{r sample_size_calc, cache=TRUE}
 set.seed(123)
 
