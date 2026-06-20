@@ -1,0 +1,62 @@
+---
+title: "Power calculations"
+author: "Jean Feng"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+```
+
+```{r}
+simulate_null_data <- function(n_obs, null_dist){
+    # TODO: sample n_obs questions, where the wins, ties, and losses are sampled from the null_distribution
+    # return num samples with wins, ties, and losses (3-dim vector)
+}
+```
+
+```{r}
+get_favorability_score <- function(empirical_dist) {
+    return (empirical_dist[1] - empirical_dist[3])/sum(empirical_dist)
+}
+```
+
+```{r}
+run_favorability_test <- function(empirical_dist, n_boot_obs=100){
+    obs_fave = get_favorability_score(empirical_dist)
+
+    n_obs <- sum(empirical_dist)
+    null_distribution <- c(
+        (empirical_dist[1] + empirical_dist[3])/2, # equalized rate of wins
+        empirical_dist[2], # rate of ties
+        (empirical_dist[1] + empirical_dist[3])/2  # equalized rate of losses
+    )/n_obs
+
+    all_null_faves = c()
+    for (b in 1:n_boot_obs) {
+        null_dist = simulate_null_data(n_obs, null_distribution)
+        null_fave = get_favorability_score(null_dist)
+        all_null_faves = c(all_null_faves, null_fave)
+    }
+    p_val = mean(abs(all_null_faves) > abs(obs_fave))
+    return p_val
+}
+```
+
+```{r}
+# TODO: get sample size calculations
+num_replicates <- 100
+alt_distribution <- c(
+    0.65, # rate of wins
+    0.2, # rate of ties
+    0.15  # rate of losses
+)
+```

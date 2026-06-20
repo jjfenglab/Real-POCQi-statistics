@@ -14,6 +14,8 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(knitr)
 library(kableExtra)
+library(lme4)
+library(broom.mixed)
 ```
 
 # Load data
@@ -236,7 +238,8 @@ qa_ratings %>%
 For every (assignment, axis) row we know which two vendors were compared
 and the chosen winner. The matrix below reports, for each ordered pair
 (row vendor vs. column vendor), the row vendor's win rate across all
-axes. Ties are reported separately.
+axes. Ties are *included* in the denominator (and count as 0 wins for
+both vendors), so cell[row, col] + cell[col, row] + tie-rate = 100%.
 
 ## Win-rate matrix
 
@@ -253,19 +256,17 @@ directed <- qa_ratings %>%
 vendor_levels <- sort(unique(c(qa_ratings$slot_a_vendor, qa_ratings$slot_b_vendor)))
 
 win_matrix <- qa_ratings %>%
-  filter(!is_tie) %>%
   mutate(
     row_vendor = slot_a_vendor,
     col_vendor = slot_b_vendor,
-    row_win = winner == slot_a_vendor
+    row_win = !is_tie & winner == slot_a_vendor
   ) %>%
   bind_rows(
     qa_ratings %>%
-      filter(!is_tie) %>%
       mutate(
         row_vendor = slot_b_vendor,
         col_vendor = slot_a_vendor,
-        row_win = winner == slot_b_vendor
+        row_win = !is_tie & winner == slot_b_vendor
       )
   ) %>%
   group_by(row_vendor, col_vendor) %>%
@@ -277,12 +278,13 @@ win_matrix <- qa_ratings %>%
   ) %>%
   mutate(cell = sprintf("%.1f%% (%d/%d)", 100 * win_rate, wins, n)) %>%
   select(row_vendor, col_vendor, cell) %>%
-  pivot_wider(names_from = col_vendor, values_from = cell, values_fill = "—") %>%
+  pivot_wider(names_from = col_vendor, values_from = cell,
+              values_fill = "—", names_sort = TRUE) %>%
   arrange(row_vendor)
 
 kable(
   win_matrix,
-  caption = "Row vendor's win rate vs. column vendor (ties excluded). Cell = win% (wins / non-tie comparisons)."
+  caption = "Row vendor's win rate vs. column vendor (ties included in denominator). Cell = win% (wins / all comparisons)."
 ) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
@@ -294,19 +296,17 @@ Same construction as the pooled matrix, repeated within each rating axis.
 ```{r winrate_matrix_per_axis, results='asis'}
 build_win_matrix <- function(df) {
   df %>%
-    filter(!is_tie) %>%
     mutate(
       row_vendor = slot_a_vendor,
       col_vendor = slot_b_vendor,
-      row_win = winner == slot_a_vendor
+      row_win = !is_tie & winner == slot_a_vendor
     ) %>%
     bind_rows(
       df %>%
-        filter(!is_tie) %>%
         mutate(
           row_vendor = slot_b_vendor,
           col_vendor = slot_a_vendor,
-          row_win = winner == slot_b_vendor
+          row_win = !is_tie & winner == slot_b_vendor
         )
     ) %>%
     group_by(row_vendor, col_vendor) %>%
@@ -318,7 +318,8 @@ build_win_matrix <- function(df) {
     ) %>%
     mutate(cell = sprintf("%.1f%% (%d/%d)", 100 * win_rate, wins, n)) %>%
     select(row_vendor, col_vendor, cell) %>%
-    pivot_wider(names_from = col_vendor, values_from = cell, values_fill = "—") %>%
+    pivot_wider(names_from = col_vendor, values_from = cell,
+              values_fill = "—", names_sort = TRUE) %>%
     arrange(row_vendor)
 }
 
@@ -331,7 +332,8 @@ for (ax in axes) {
     kable(
       mat,
       caption = sprintf(
-        "Row vendor's win rate vs. column vendor on axis = %s (ties excluded).",
+        paste0("Row vendor's win rate vs. column vendor on axis = %s ",
+               "(ties included in denominator)."),
         ax
       )
     ) %>%
@@ -357,7 +359,7 @@ for (sv in subversions) {
       mat,
       caption = sprintf(
         paste0("Row vendor's win rate vs. column vendor for ",
-               "rendering mode = %s (ties excluded)."),
+               "rendering mode = %s (ties included in denominator)."),
         sv
       )
     ) %>%
@@ -418,7 +420,7 @@ build_margin_matrix <- function(df) {
                           n)) %>%
     select(row_vendor, col_vendor, cell) %>%
     pivot_wider(names_from = col_vendor, values_from = cell,
-                values_fill = "—") %>%
+                values_fill = "—", names_sort = TRUE) %>%
     arrange(row_vendor)
 }
 ```
