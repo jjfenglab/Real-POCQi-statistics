@@ -158,6 +158,153 @@ run_favorability_analysis(qa_ratings, "verifiability") %>%
   format_favorability_table("verifiability")
 ```
 
+# Sensitivity analysis: Length-stratified favorability tests
+
+Re-runs the one-vs-rest favorability score test, but stratified by
+whether the vendor under test produced a *longer* or *shorter* answer
+than its comparator (character length from `blinded_qa_answers.csv`).
+Unlike the primary analysis, rendering conditions are **pooled** here
+(all `subversion` values included). The comparison count drops because
+each comparison goes into exactly one stratum; equal-length answers are
+not expected and raise an error if encountered.
+
+```{r length_stratified_helpers}
+answer_lengths <- read_csv(file.path(data_dir, "blinded_qa_answers.csv")) %>%
+  select(question_id, vendor, answer_len)
+
+qa_ratings_with_lengths <- qa_ratings %>%
+  left_join(
+    answer_lengths %>%
+      rename(slot_a_vendor = vendor, slot_a_answer_len = answer_len),
+    by = c("question_id", "slot_a_vendor")
+  ) %>%
+  left_join(
+    answer_lengths %>%
+      rename(slot_b_vendor = vendor, slot_b_answer_len = answer_len),
+    by = c("question_id", "slot_b_vendor")
+  )
+
+prepare_one_vs_rest_df_with_lengths <- function(df, vendor) {
+  df %>%
+    filter(slot_a_vendor == vendor | slot_b_vendor == vendor) %>%
+    mutate(
+      vendor_len     = if_else(slot_a_vendor == vendor,
+                               slot_a_answer_len, slot_b_answer_len),
+      comparator_len = if_else(slot_a_vendor == vendor,
+                               slot_b_answer_len, slot_a_answer_len),
+      outcome = case_when(
+        winner == vendor ~ 1L,
+        loser  == vendor ~ -1L,
+        is_tie ~ 0L
+      )
+    ) %>%
+    select(question_id, outcome, vendor_len, comparator_len)
+}
+
+run_length_stratified_analysis <- function(df, axis_name,
+                                           n_boot = 2000, seed = 42) {
+  set.seed(seed)
+
+  axis_df <- df %>% filter(axis == axis_name)
+  vendors <- sort(unique(c(axis_df$slot_a_vendor, axis_df$slot_b_vendor)))
+
+  map_dfr(vendors, function(v) {
+    base_df <- prepare_one_vs_rest_df_with_lengths(axis_df, v)
+
+    if (any(base_df$vendor_len == base_df$comparator_len)) {
+      stop(sprintf(
+        "Equal answer lengths for vendor %s on axis %s — unexpected.",
+        v, axis_name
+      ))
+    }
+
+    map_dfr(c("longer", "shorter"), function(stratum) {
+      stratum_df <- base_df %>%
+        filter(if (stratum == "longer") vendor_len > comparator_len
+                                  else vendor_len < comparator_len) %>%
+        select(question_id, outcome)
+
+      fav_score   <- get_favorability_score(stratum_df$outcome)
+      test_result <- run_favorability_test(stratum_df,
+                                           n_boot = n_boot, ci_level = 0.95)
+
+      tibble(
+        vendor       = v,
+        stratum      = stratum,
+        wins         = sum(stratum_df$outcome == 1),
+        ties         = sum(stratum_df$outcome == 0),
+        losses       = sum(stratum_df$outcome == -1),
+        n            = nrow(stratum_df),
+        favorability = fav_score,
+        ci_lower     = test_result$ci_lower,
+        ci_upper     = test_result$ci_upper,
+        p_value      = test_result$p_value
+      )
+    })
+  })
+}
+
+format_length_stratified_table <- function(results, axis_name) {
+  results %>%
+    mutate(
+      favorability = sprintf("%.1f%%", 100 * favorability),
+      ci_95        = sprintf("[%.1f%%, %.1f%%]",
+                             100 * ci_lower, 100 * ci_upper),
+      p_value      = sprintf("%.4f", p_value)
+    ) %>%
+    select(vendor, stratum, wins, ties, losses, n,
+           favorability, ci_95, p_value) %>%
+    arrange(vendor, stratum) %>%
+    kable(caption = sprintf(
+      paste0("Length-stratified one-vs-rest favorability test ",
+             "(pooled rendering, %s axis). Stratum = vendor's answer ",
+             "longer/shorter than comparator."),
+      axis_name
+    )) %>%
+    kable_styling(full_width = FALSE,
+                  bootstrap_options = c("striped", "hover"))
+}
+```
+
+## Clinical utility
+
+```{r length_stratified_clinical}
+run_length_stratified_analysis(qa_ratings_with_lengths,
+                               "clinical_utility") %>%
+  format_length_stratified_table("clinical utility")
+```
+
+## Accuracy
+
+```{r length_stratified_accuracy}
+run_length_stratified_analysis(qa_ratings_with_lengths, "accuracy") %>%
+  format_length_stratified_table("accuracy")
+```
+
+## Authoritativeness
+
+```{r length_stratified_authoritativeness}
+run_length_stratified_analysis(qa_ratings_with_lengths,
+                               "authoritativeness") %>%
+  format_length_stratified_table("authoritativeness")
+```
+
+## Completeness
+
+```{r length_stratified_completeness}
+run_length_stratified_analysis(qa_ratings_with_lengths,
+                               "completeness") %>%
+  format_length_stratified_table("completeness")
+```
+
+## Verifiability
+
+```{r length_stratified_verifiability}
+run_length_stratified_analysis(qa_ratings_with_lengths,
+                               "verifiability") %>%
+  format_length_stratified_table("verifiability")
+```
+
 # Secondary analysis: Win-rate tables
 
 For every (assignment, axis) row we know which two vendors were compared

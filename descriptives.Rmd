@@ -82,6 +82,20 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
     collapse = "; "
   )
 
+  questions_per_vendor <- qa_ratings_subset %>%
+    distinct(qa_assignment_id, question_id, slot_a_vendor, slot_b_vendor) %>%
+    pivot_longer(c(slot_a_vendor, slot_b_vendor),
+                 names_to = "slot", values_to = "vendor") %>%
+    distinct(vendor, question_id) %>%
+    count(vendor, name = "n_questions") %>%
+    arrange(vendor)
+
+  questions_per_vendor_summary <- paste(
+    sprintf("%s: %d", questions_per_vendor$vendor,
+            questions_per_vendor$n_questions),
+    collapse = "; "
+  )
+
   per_user_completed <- qa_ratings_subset %>%
     distinct(user_id, qa_assignment_id) %>%
     count(user_id, name = "n_completed")
@@ -149,6 +163,7 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
     n_distinct(qa_ratings_subset$question_id),
     sprintf("%.0f", mean_ratings_per_axis),
     ratings_per_vendor_summary,
+    questions_per_vendor_summary,
     sprintf("%.1f ± %.1f",
             ratings_per_question_stats$mean_n,
             ratings_per_question_stats$sd_n),
@@ -188,6 +203,7 @@ table1 <- tibble(
     "Questions with ≥1 rating",
     "Total ratings collected (mean across evaluation dimensions)",
     "Ratings collected per blinded vendor (comparisons)",
+    "Unique questions evaluated per blinded vendor",
     "Ratings per question (mean ± SD)",
     "Ratings per question (median [min, max])",
     "Specialties with ≥1 rating",
