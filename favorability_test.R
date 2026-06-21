@@ -7,9 +7,10 @@ get_favorability_score <- function(outcomes) {
   (wins - losses) / n
 }
 
-run_favorability_test <- function(df, n_boot = 1000) {
+run_favorability_test <- function(df, n_boot = 1000, ci_level = 0.95) {
 
   stopifnot(all(c("question_id", "outcome") %in% names(df)))
+  stopifnot(ci_level > 0 && ci_level < 1)
 
   obs_fave <- get_favorability_score(df$outcome)
 
@@ -30,43 +31,34 @@ run_favorability_test <- function(df, n_boot = 1000) {
   })
 
   p_val <- mean(abs(null_faves) >= abs(obs_fave))
-  p_val
-}
 
-simulate_null_data <- function(n_obs, null_dist) {
-  counts <- as.vector(rmultinom(1, n_obs, null_dist))
-  counts
-}
-
-get_favorability_score_from_counts <- function(empirical_dist) {
-  (empirical_dist[1] - empirical_dist[3]) / sum(empirical_dist)
-}
-
-run_favorability_test_simple <- function(empirical_dist, n_boot_obs = 1000) {
-  obs_fave <- get_favorability_score_from_counts(empirical_dist)
-
-  n_obs <- sum(empirical_dist)
-  null_distribution <- c(
-    (empirical_dist[1] + empirical_dist[3]) / 2,
-    empirical_dist[2],
-    (empirical_dist[1] + empirical_dist[3]) / 2
-  ) / n_obs
-
-  all_null_faves <- replicate(n_boot_obs, {
-    null_dist <- simulate_null_data(n_obs, null_distribution)
-    get_favorability_score_from_counts(null_dist)
+  boot_faves <- replicate(n_boot, {
+    sampled_questions <- sample(questions, n_questions, replace = TRUE)
+    boot_outcomes <- unlist(lapply(sampled_questions, function(q) {
+      df$outcome[df$question_id == q]
+    }))
+    get_favorability_score(boot_outcomes)
   })
 
-  p_val <- mean(abs(all_null_faves) >= abs(obs_fave))
-  p_val
+  alpha <- 1 - ci_level
+  ci <- quantile(boot_faves, c(alpha / 2, 1 - alpha / 2), names = FALSE)
+
+  list(
+    p_value = p_val,
+    favorability = obs_fave,
+    ci_lower = ci[1],
+    ci_upper = ci[2]
+  )
 }
 
 calc_power <- function(n_obs, alt_distribution, alpha = 0.05,
                        num_replicates = 100, n_boot = 1000) {
   rejections <- replicate(num_replicates, {
-    empirical_dist <- simulate_null_data(n_obs, alt_distribution)
-    p_val <- run_favorability_test_simple(empirical_dist, n_boot_obs = n_boot)
-    p_val < alpha
+    counts <- as.vector(rmultinom(1, n_obs, alt_distribution))
+    outcomes <- rep(c(1, 0, -1), counts)
+    df <- data.frame(question_id = seq_along(outcomes), outcome = outcomes)
+    result <- run_favorability_test(df, n_boot = n_boot)
+    result$p_value < alpha
   })
   mean(rejections)
 }

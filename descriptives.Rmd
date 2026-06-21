@@ -22,37 +22,18 @@ source("favorability_test.R")
 
 # Load data
 
+Vendor identities are blinded by `blind_vendors.R`, which writes the
+`blinded_*.csv` files read below and a `secret_mapping.txt` file (kept
+outside the analysis pipeline). Run `Rscript blind_vendors.R` before
+knitting this document.
+
 ```{r load}
 data_dir <- "pilot_data"
 
-assignments <- read_csv(file.path(data_dir, "qa_assignments.csv"))
-questions   <- read_csv(file.path(data_dir, "qa_questions.csv"))
-ratings     <- read_csv(file.path(data_dir, "ratings.csv"))
-users       <- read_csv(file.path(data_dir, "users.csv"))
-```
-
-# Mask vendor identities
-
-All vendor names are replaced with masked labels (A, B, C, D) for the
-remainder of the analysis. The mapping is intentionally scrambled and lives
-only in this chunk.
-
-```{r mask, echo = FALSE}
-vendor_mapping <- c(
-  "gpt-5.5"        = "A",
-  "openevidence"   = "B",
-  "claude-opus-4-8"= "C",
-  "gemini-3.1-pro" = "D"
-)
-
-mask_vendor <- function(x) unname(vendor_mapping[x])
-
-assignments <- assignments %>%
-  mutate(
-    slot_a_vendor = mask_vendor(slot_a_provider),
-    slot_b_vendor = mask_vendor(slot_b_provider)
-  ) %>%
-  select(-slot_a_provider, -slot_b_provider)
+assignments <- read_csv(file.path(data_dir, "blinded_qa_assignments.csv"))
+questions   <- read_csv(file.path(data_dir, "blinded_qa_questions.csv"))
+ratings     <- read_csv(file.path(data_dir, "blinded_ratings.csv"))
+users       <- read_csv(file.path(data_dir, "blinded_users.csv"))
 ```
 
 # Build the analytic dataset
@@ -483,7 +464,7 @@ for (sv in subversions) {
 }
 ```
 
-# Favorability Score Tests
+# Primary Analysis: Favorability Score Tests
 
 One-vs-rest favorability score test for each vendor on the clinical_utility
 axis, restricted to the text-only rendering condition. Bootstrap resamples
@@ -522,7 +503,7 @@ favorability_results <- map_dfr(vendors, function(v) {
   n <- nrow(test_df)
 
   fav_score <- get_favorability_score(test_df$outcome)
-  p_val <- run_favorability_test(test_df, n_boot = 2000)
+  test_result <- run_favorability_test(test_df, n_boot = 2000)
 
   tibble(
     vendor = v,
@@ -531,15 +512,19 @@ favorability_results <- map_dfr(vendors, function(v) {
     losses = losses,
     n = n,
     favorability = fav_score,
-    p_value = p_val
+    ci_lower = test_result$ci_lower,
+    ci_upper = test_result$ci_upper,
+    p_value = test_result$p_value
   )
 })
 
 favorability_results %>%
   mutate(
     favorability = sprintf("%.1f%%", 100 * favorability),
+    ci_95 = sprintf("[%.1f%%, %.1f%%]", 100 * ci_lower, 100 * ci_upper),
     p_value = sprintf("%.4f", p_value)
   ) %>%
+  select(vendor, wins, ties, losses, n, favorability, ci_95, p_value) %>%
   kable(caption = "One-vs-rest favorability score test (text-only, clinical utility axis)") %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
