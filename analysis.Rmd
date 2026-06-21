@@ -7,6 +7,8 @@ output:
     toc: true
     toc_float: true
     df_print: paged
+params:
+  data_dir: null
 ---
 
 ```{r setup, include=FALSE}
@@ -30,7 +32,8 @@ outside the analysis pipeline). Run
 before knitting this document.
 
 ```{r load}
-data_dir <- "pilot_data"
+if (is.null(params$data_dir)) stop("`data_dir` parameter is required")
+data_dir <- params$data_dir
 
 assignments <- read_csv(file.path(data_dir, "blinded_qa_assignments.csv"))
 questions   <- read_csv(file.path(data_dir, "blinded_qa_questions.csv"))
@@ -81,7 +84,7 @@ run_favorability_analysis <- function(df, axis_name,
     test_df <- prepare_one_vs_rest_df(axis_df, v)
 
     fav_score <- get_favorability_score(test_df$outcome)
-    test_result <- run_favorability_test(test_df, n_boot = n_boot)
+    test_result <- run_favorability_test(test_df, n_boot = n_boot, ci_level=0.95)
 
     tibble(
       vendor = v,
@@ -128,7 +131,28 @@ run_favorability_analysis(qa_ratings, "accuracy") %>%
   format_favorability_table("accuracy")
 ```
 
-# Win-rate tables
+## Authoritativeness
+
+```{r favorability_test_authoritativeness}
+run_favorability_analysis(qa_ratings, "authoritativeness") %>%
+  format_favorability_table("authoritativeness")
+```
+
+## Completeness
+
+```{r favorability_test_completeness}
+run_favorability_analysis(qa_ratings, "completeness") %>%
+  format_favorability_table("completeness")
+```
+
+## Verifiability
+
+```{r favorability_test_verifiability}
+run_favorability_analysis(qa_ratings, "verifiability") %>%
+  format_favorability_table("verifiability")
+```
+
+# Secondary analysis: Win-rate tables
 
 For every (assignment, axis) row we know which two vendors were compared
 and the chosen winner. The matrix below reports, for each ordered pair
@@ -136,7 +160,7 @@ and the chosen winner. The matrix below reports, for each ordered pair
 axes. Ties are *included* in the denominator (and count as 0 wins for
 both vendors), so cell[row, col] + cell[col, row] + tie-rate = 100%.
 
-## Win-rate matrix
+## Win-rate matrix (aggregate)
 
 ```{r winrate_matrix}
 build_win_matrix <- function(df, n_boot = 1000) {
@@ -247,7 +271,7 @@ for (sv in subversions) {
 }
 ```
 
-# Win-margin tables
+# Sensitivity analysis: Win-margin tables
 
 Same row-vs-column structure as the win-rate matrices, but each cell is
 the mean number of Likert units the row vendor beat the column vendor
