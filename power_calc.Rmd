@@ -38,7 +38,7 @@ alt_distribution <- c(
 
 sample_sizes <- seq(20, 200, by = 20)
 num_replicates <- 500
-n_boot <- 1000
+n_boot <- 100
 alpha <- 0.025
 target_power <- 0.90
 

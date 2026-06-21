@@ -21,6 +21,12 @@ ratings     <- read_csv(file.path(data_dir, "ratings.csv"),
                         show_col_types = FALSE)
 users       <- read_csv(file.path(data_dir, "users.csv"),
                         show_col_types = FALSE)
+prior_users_path <- file.path(data_dir, "prior_users.csv")
+prior_users <- if (file.exists(prior_users_path)) {
+  read_csv(prior_users_path, show_col_types = FALSE)
+} else {
+  NULL
+}
 
 vendors <- sort(unique(c(assignments$slot_a_provider,
                          assignments$slot_b_provider)))
@@ -43,6 +49,9 @@ write_csv(assignments_blinded,
 write_csv(questions, file.path(data_dir, "blinded_qa_questions.csv"))
 write_csv(ratings,   file.path(data_dir, "blinded_ratings.csv"))
 write_csv(users,     file.path(data_dir, "blinded_users.csv"))
+if (!is.null(prior_users)) {
+  write_csv(prior_users, file.path(data_dir, "blinded_prior_users.csv"))
+}
 
 writeLines(
   c(

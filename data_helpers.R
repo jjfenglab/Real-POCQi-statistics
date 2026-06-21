@@ -1,6 +1,10 @@
 library(dplyr)
 
-build_qa_ratings <- function(ratings, assignments, questions, users) {
+build_qa_ratings <- function(ratings, assignments, questions, users,
+                             prior_users = NULL) {
+  if (!is.null(prior_users)) {
+    assignments <- assignments %>% filter(!user_id %in% prior_users)
+  }
   ratings %>%
     filter(!is.na(qa_assignment_id)) %>%
     inner_join(

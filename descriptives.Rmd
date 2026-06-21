@@ -35,6 +35,12 @@ assignments <- read_csv(file.path(data_dir, "blinded_qa_assignments.csv"))
 questions   <- read_csv(file.path(data_dir, "blinded_qa_questions.csv"))
 ratings     <- read_csv(file.path(data_dir, "blinded_ratings.csv"))
 users       <- read_csv(file.path(data_dir, "blinded_users.csv"))
+prior_users_path <- file.path(data_dir, "blinded_prior_users.csv")
+prior_users <- if (file.exists(prior_users_path)) {
+  read_csv(prior_users_path)
+} else {
+  NULL
+}
 ```
 
 # Build the analytic dataset
@@ -43,7 +49,7 @@ Join ratings to assignments, attach question specialty, and decode the
 choice into a winner (vendor in slot A, vendor in slot B, or tie).
 
 ```{r analytic}
-qa_ratings <- build_qa_ratings(ratings, assignments, questions, users)
+qa_ratings <- build_qa_ratings(ratings, assignments, questions, users, prior_users = prior_users)
 ```
 
 # Table 1: Cohort summary
