@@ -14,5 +14,5 @@ Rscript blind_vendors.R "${data_dir}" "${mapping_path}"
 echo "## Knitting descriptives.Rmd..."
 Rscript -e "rmarkdown::render('descriptives.Rmd', params=list(data_dir='${data_dir}'), output_dir='${data_dir}')"
 
-# echo "## Knitting analysis.Rmd..."
-# Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}'), output_dir='${data_dir}')"
+echo "## Knitting analysis.Rmd..."
+Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}'), output_dir='${data_dir}')"

@@ -255,6 +255,10 @@ specialty_counts %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
+<!-- ```{r specialty_list}
+paste0(unique(questions$specialty), collapse=", ")
+``` -->
+
 ```{r specialty_used}
 specialty_summary <- qa_ratings %>%
   group_by(specialty) %>%
