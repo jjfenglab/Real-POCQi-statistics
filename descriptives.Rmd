@@ -1,0 +1,188 @@
+---
+title: "Descriptives only"
+author: "Jean Feng"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+
+source("data_helpers.R")
+```
+
+# Load data
+
+Vendor identities are blinded by `blind_vendors.R`, which writes the
+`blinded_*.csv` files read below and a `secret_mapping.txt` file (kept
+outside the analysis pipeline). Run `Rscript blind_vendors.R` before
+knitting this document.
+
+```{r load}
+data_dir <- "pilot_data"
+
+assignments <- read_csv(file.path(data_dir, "blinded_qa_assignments.csv"))
+questions   <- read_csv(file.path(data_dir, "blinded_qa_questions.csv"))
+ratings     <- read_csv(file.path(data_dir, "blinded_ratings.csv"))
+users       <- read_csv(file.path(data_dir, "blinded_users.csv"))
+```
+
+# Build the analytic dataset
+
+Join ratings to assignments, attach question specialty, and decode the
+choice into a winner (vendor in slot A, vendor in slot B, or tie).
+
+```{r analytic}
+qa_ratings <- build_qa_ratings(ratings, assignments, questions, users)
+```
+
+# Table 1: Cohort summary
+
+```{r table1}
+completed_assignments <- assignments %>% filter(!is.na(completed_at))
+
+n_questions_total  <- n_distinct(questions$id)
+n_questions_used   <- n_distinct(qa_ratings$question_id)
+n_graders_assigned <- n_distinct(assignments$user_id)
+n_graders_rated    <- n_distinct(qa_ratings$user_id)
+n_specialties_rated      <- n_distinct(qa_ratings$specialty)
+n_specialties      <- n_distinct(questions$specialty)
+
+per_user_completed <- completed_assignments %>%
+  count(user_id, name = "n_completed")
+
+avg_completed_per_user <- per_user_completed %>%
+  summarise(
+    mean_n = mean(n_completed),
+    sd_n   = sd(n_completed),
+    median_n = median(n_completed),
+    min_n = min(n_completed),
+    max_n = max(n_completed)
+  )
+
+submission_time_stats <- qa_ratings %>%
+  filter(!is.na(submission_time_seconds)) %>%
+  summarise(
+    mean_t   = mean(submission_time_seconds),
+    sd_t     = sd(submission_time_seconds),
+    median_t = median(submission_time_seconds),
+    min_t    = min(submission_time_seconds),
+    max_t    = max(submission_time_seconds)
+  )
+
+users_per_subversion <- qa_ratings %>%
+  distinct(user_id) %>%
+  inner_join(users %>% select(id, subversion),
+             by = c("user_id" = "id")) %>%
+  count(subversion, name = "n_users") %>%
+  arrange(subversion)
+
+subversion_summary <- paste(
+  sprintf("%s: %d", users_per_subversion$subversion,
+          users_per_subversion$n_users),
+  collapse = "; "
+)
+
+users_with_ratings <- unique(qa_ratings$user_id)
+
+per_user_rate <- users %>%
+  filter(id %in% users_with_ratings) %>%
+  left_join(per_user_completed, by = c("id" = "user_id")) %>%
+  mutate(
+    n_completed = coalesce(n_completed, 0L),
+    completion_rate = n_completed / required_task_count
+  )
+
+completion_rate_stats <- per_user_rate %>%
+  summarise(
+    mean_r = mean(completion_rate),
+    sd_r   = sd(completion_rate)
+  )
+
+table1 <- tibble(
+  Metric = c(
+    "Total questions in question bank",
+    "Total unique specialties in question bank",
+    "Questions with ≥1 rating",
+    "Specialties with ≥1 rating",
+    "Graders who submitted ≥1 rating",
+    "Graders with ≥1 rating per rendering mode",
+    "Completed assignments per grader (mean ± SD)",
+    "Completed assignments per grader (median [min, max])",
+    "Survey completion rate per grader (mean ± SD)",
+    "Submission time, seconds (mean ± SD)",
+    "Submission time, seconds (median [min, max])"
+  ),
+  Value = c(
+    n_questions_total,
+    n_specialties,
+    n_questions_used,
+    n_specialties_rated,
+    n_graders_rated,
+    subversion_summary,
+    sprintf("%.1f ± %.1f",
+            avg_completed_per_user$mean_n,
+            avg_completed_per_user$sd_n),
+    sprintf("%d [%d, %d]",
+            as.integer(avg_completed_per_user$median_n),
+            as.integer(avg_completed_per_user$min_n),
+            as.integer(avg_completed_per_user$max_n)),
+    sprintf("%.1f%% ± %.1f%%",
+            100 * completion_rate_stats$mean_r,
+            100 * completion_rate_stats$sd_r),
+    sprintf("%.1f ± %.1f",
+            submission_time_stats$mean_t,
+            submission_time_stats$sd_t),
+    sprintf("%d [%d, %d]",
+            as.integer(submission_time_stats$median_t),
+            as.integer(submission_time_stats$min_t),
+            as.integer(submission_time_stats$max_t))
+  )
+)
+
+kable(table1, caption = "Table 1. Pilot cohort summary.") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+## Submission time distribution
+
+```{r submission_time_plot}
+qa_ratings %>%
+  filter(!is.na(submission_time_seconds)) %>%
+  ggplot(aes(x = submission_time_seconds)) +
+  geom_histogram(bins = 40, fill = "steelblue", color = "white") +
+  scale_x_continuous(labels = scales::comma) +
+  labs(
+    x = "Submission time (seconds)",
+    y = "Number of ratings",
+    title = "Distribution of submission time per rating"
+  ) +
+  theme_minimal()
+```
+
+## Questions per specialty
+
+```{r specialty}
+questions %>%
+  count(specialty, name = "n_questions") %>%
+  arrange(desc(n_questions)) %>%
+  mutate(pct = sprintf("%.1f%%", 100 * n_questions / sum(n_questions))) %>%
+  kable(caption = "Number of questions per specialty (full question bank).") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+```{r specialty_used}
+qa_ratings %>%
+  distinct(question_id, specialty) %>%
+  count(specialty, name = "n_questions_rated") %>%
+  arrange(desc(n_questions_rated)) %>%
+  kable(caption = "Number of rated questions per specialty (pilot).") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
