@@ -69,6 +69,19 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
     summarise(mean_n = mean(n_ratings)) %>%
     pull(mean_n)
 
+  ratings_per_vendor <- qa_ratings_subset %>%
+    distinct(qa_assignment_id, slot_a_vendor, slot_b_vendor) %>%
+    pivot_longer(c(slot_a_vendor, slot_b_vendor),
+                 names_to = "slot", values_to = "vendor") %>%
+    count(vendor, name = "n_comparisons") %>%
+    arrange(vendor)
+
+  ratings_per_vendor_summary <- paste(
+    sprintf("%s: %d", ratings_per_vendor$vendor,
+            ratings_per_vendor$n_comparisons),
+    collapse = "; "
+  )
+
   per_user_completed <- qa_ratings_subset %>%
     distinct(user_id, qa_assignment_id) %>%
     count(user_id, name = "n_completed")
@@ -135,6 +148,7 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
     n_specialties,
     n_distinct(qa_ratings_subset$question_id),
     sprintf("%.0f", mean_ratings_per_axis),
+    ratings_per_vendor_summary,
     sprintf("%.1f ± %.1f",
             ratings_per_question_stats$mean_n,
             ratings_per_question_stats$sd_n),
@@ -173,6 +187,7 @@ table1 <- tibble(
     "Total unique specialties in question bank",
     "Questions with ≥1 rating",
     "Total ratings collected (mean across evaluation dimensions)",
+    "Ratings collected per blinded vendor (comparisons)",
     "Ratings per question (mean ± SD)",
     "Ratings per question (median [min, max])",
     "Specialties with ≥1 rating",
@@ -319,24 +334,35 @@ number of questions for which both vendors have an answer length on
 record. Diagonal cells are blank.
 
 ```{r length_win_matrix}
-answers_for_pairs <- qa_answers %>%
+answer_len_lookup <- qa_answers %>%
   filter(!is.na(answer_len)) %>%
   select(question_id, vendor, answer_len)
 
-vendor_levels <- sort(unique(answers_for_pairs$vendor))
+vendor_levels <- sort(unique(answer_len_lookup$vendor))
 
-length_pairs <- inner_join(
-  answers_for_pairs %>% rename(vendor_row = vendor, len_row = answer_len),
-  answers_for_pairs %>% rename(vendor_col = vendor, len_col = answer_len),
-  by = "question_id",
-  relationship = "many-to-many"
+len_a_lookup <- answer_len_lookup %>%
+  rename(slot_a_vendor = vendor, len_a = answer_len)
+len_b_lookup <- answer_len_lookup %>%
+  rename(slot_b_vendor = vendor, len_b = answer_len)
+
+rated_comparisons <- qa_ratings %>%
+  distinct(qa_assignment_id, question_id, slot_a_vendor, slot_b_vendor) %>%
+  inner_join(len_a_lookup, by = c("question_id", "slot_a_vendor")) %>%
+  inner_join(len_b_lookup, by = c("question_id", "slot_b_vendor"))
+
+length_pairs <- bind_rows(
+  rated_comparisons %>%
+    transmute(vendor_row = slot_a_vendor, vendor_col = slot_b_vendor,
+              row_longer = len_a > len_b),
+  rated_comparisons %>%
+    transmute(vendor_row = slot_b_vendor, vendor_col = slot_a_vendor,
+              row_longer = len_b > len_a)
 ) %>%
-  filter(vendor_row != vendor_col) %>%
   group_by(vendor_row, vendor_col) %>%
   summarise(
-    n_questions = n(),
-    n_row_longer = sum(len_row > len_col),
-    win_rate = n_row_longer / n_questions,
+    n_comparisons = n(),
+    n_row_longer = sum(row_longer),
+    win_rate = n_row_longer / n_comparisons,
     .groups = "drop"
   ) %>%
   mutate(
@@ -348,12 +374,16 @@ length_pairs <- inner_join(
 ```{r length_win_matrix_table}
 length_pairs %>%
   mutate(cell = sprintf("%.1f%% (%d/%d)",
-                        100 * win_rate, n_row_longer, n_questions)) %>%
+                        100 * win_rate, n_row_longer, n_comparisons)) %>%
   select(vendor_row, vendor_col, cell) %>%
   pivot_wider(names_from = vendor_col, values_from = cell, values_fill = "—",
               names_sort = TRUE) %>%
   arrange(vendor_row) %>%
   rename(`Row vendor` = vendor_row) %>%
-  kable(caption = "Length-based win rate: P(row vendor's answer is longer than column vendor's), with (wins / paired questions).") %>%
+  kable(caption = paste(
+    "Length-based win rate among rated comparisons:",
+    "P(row vendor's answer is longer than column vendor's),",
+    "with (wins / rated comparisons)."
+  )) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
