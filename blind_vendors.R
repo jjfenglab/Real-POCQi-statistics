@@ -27,6 +27,10 @@ prior_users <- if (file.exists(prior_users_path)) {
 } else {
   NULL
 }
+qa_answers      <- read_csv(file.path(data_dir, "qa_answers.csv"),
+                            show_col_types = FALSE)
+answer_lengths  <- read_csv(file.path(data_dir, "answer_lengths.csv"),
+                            show_col_types = FALSE)
 
 vendors <- sort(unique(c(assignments$slot_a_provider,
                          assignments$slot_b_provider)))
@@ -44,11 +48,24 @@ assignments_blinded <- assignments %>%
   ) %>%
   select(-slot_a_provider, -slot_b_provider)
 
+unknown_providers <- setdiff(qa_answers$provider_key, names(vendor_mapping))
+if (length(unknown_providers) > 0) {
+  stop(sprintf("qa_answers.csv has provider_key values not in assignments: %s",
+               paste(unknown_providers, collapse = ", ")))
+}
+
+qa_answers_blinded <- qa_answers %>%
+  rename(answer_id = id) %>%
+  mutate(vendor = unname(vendor_mapping[provider_key])) %>%
+  left_join(answer_lengths, by = "answer_id") %>%
+  select(question_id, answer_id, vendor, answer_len)
+
 write_csv(assignments_blinded,
           file.path(data_dir, "blinded_qa_assignments.csv"))
-write_csv(questions, file.path(data_dir, "blinded_qa_questions.csv"))
-write_csv(ratings,   file.path(data_dir, "blinded_ratings.csv"))
-write_csv(users,     file.path(data_dir, "blinded_users.csv"))
+write_csv(questions,          file.path(data_dir, "blinded_qa_questions.csv"))
+write_csv(ratings,            file.path(data_dir, "blinded_ratings.csv"))
+write_csv(users,              file.path(data_dir, "blinded_users.csv"))
+write_csv(qa_answers_blinded, file.path(data_dir, "blinded_qa_answers.csv"))
 if (!is.null(prior_users)) {
   write_csv(prior_users, file.path(data_dir, "blinded_prior_users.csv"))
 }

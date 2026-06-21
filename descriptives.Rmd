@@ -33,6 +33,7 @@ data_dir <- params$data_dir
 
 assignments <- read_csv(file.path(data_dir, "blinded_qa_assignments.csv"))
 questions   <- read_csv(file.path(data_dir, "blinded_qa_questions.csv"))
+qa_answers   <- read_csv(file.path(data_dir, "blinded_qa_answers.csv"))
 ratings     <- read_csv(file.path(data_dir, "blinded_ratings.csv"))
 users       <- read_csv(file.path(data_dir, "blinded_users.csv"))
 prior_users_path <- file.path(data_dir, "blinded_prior_users.csv")
@@ -63,6 +64,11 @@ assignments_in_queue <- assignments %>%
   count(user_id, name = "n_assigned")
 
 summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
+  mean_ratings_per_axis <- qa_ratings_subset %>%
+    count(axis, name = "n_ratings") %>%
+    summarise(mean_n = mean(n_ratings)) %>%
+    pull(mean_n)
+
   per_user_completed <- qa_ratings_subset %>%
     distinct(user_id, qa_assignment_id) %>%
     count(user_id, name = "n_completed")
@@ -128,6 +134,7 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
     n_questions_total,
     n_specialties,
     n_distinct(qa_ratings_subset$question_id),
+    sprintf("%.0f", mean_ratings_per_axis),
     sprintf("%.1f ± %.1f",
             ratings_per_question_stats$mean_n,
             ratings_per_question_stats$sd_n),
@@ -165,6 +172,7 @@ table1 <- tibble(
     "Total questions in question bank",
     "Total unique specialties in question bank",
     "Questions with ≥1 rating",
+    "Total ratings collected (mean across evaluation dimensions)",
     "Ratings per question (mean ± SD)",
     "Ratings per question (median [min, max])",
     "Specialties with ≥1 rating",
@@ -234,5 +242,118 @@ specialty_total <- tibble(
 
 bind_rows(specialty_summary, specialty_total) %>%
   kable(caption = "Number of rated questions per specialty (pilot).") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+# Answer length distribution by vendor
+
+Each rated assignment shows the grader two answers (slots A and B). The
+plots below describe the character lengths of those rated answers,
+stratified by the blinded vendor that produced them.
+
+```{r answer_lengths_rated}
+rated_answer_lengths <- qa_ratings %>%
+  select(question_id, slot_a_vendor, slot_b_vendor) %>%
+  pivot_longer(c(slot_a_vendor, slot_b_vendor),
+               names_to = "slot", values_to = "vendor") %>%
+  inner_join(qa_answers %>% select(question_id, vendor, answer_len),
+             by = c("question_id", "vendor")) %>%
+  filter(!is.na(answer_len))
+```
+
+```{r answer_lengths_table}
+rated_answer_lengths %>%
+  group_by(vendor) %>%
+  summarise(
+    n_rated_answers = n(),
+    mean_len   = mean(answer_len),
+    sd_len     = sd(answer_len),
+    median_len = median(answer_len),
+    min_len    = min(answer_len),
+    max_len    = max(answer_len),
+    .groups = "drop"
+  ) %>%
+  arrange(vendor) %>%
+  mutate(
+    `Mean ± SD` = sprintf("%.0f ± %.0f", mean_len, sd_len),
+    `Median [min, max]` = sprintf("%.0f [%.0f, %.0f]",
+                                  median_len, min_len, max_len)
+  ) %>%
+  select(Vendor = vendor, `Rated answers (n)` = n_rated_answers,
+         `Mean ± SD`, `Median [min, max]`) %>%
+  kable(caption = "Answer length (characters) per blinded vendor, across rated assignments.") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+```{r answer_lengths_histogram}
+ggplot(rated_answer_lengths, aes(x = answer_len, fill = vendor)) +
+  geom_histogram(bins = 40, color = "white", show.legend = FALSE) +
+  facet_wrap(~ vendor, scales = "free_y") +
+  scale_x_log10(labels = scales::comma) +
+  labs(
+    x = "Answer length (characters, log scale)",
+    y = "Number of rated answers",
+    title = "Distribution of rated answer lengths, by blinded vendor"
+  ) +
+  theme_minimal()
+```
+
+```{r answer_lengths_boxplot}
+ggplot(rated_answer_lengths, aes(x = vendor, y = answer_len, fill = vendor)) +
+  geom_boxplot(show.legend = FALSE, outlier.alpha = 0.4) +
+  scale_y_log10(labels = scales::comma) +
+  labs(
+    x = "Blinded vendor",
+    y = "Answer length (characters, log scale)",
+    title = "Rated answer length by blinded vendor"
+  ) +
+  theme_minimal()
+```
+
+## Length-based win-rate matrix
+
+For each ordered pair of vendors (row, column), the cell reports the
+fraction of questions on which the row vendor's answer is strictly
+longer (in characters) than the column vendor's. The denominator is the
+number of questions for which both vendors have an answer length on
+record. Diagonal cells are blank.
+
+```{r length_win_matrix}
+answers_for_pairs <- qa_answers %>%
+  filter(!is.na(answer_len)) %>%
+  select(question_id, vendor, answer_len)
+
+vendor_levels <- sort(unique(answers_for_pairs$vendor))
+
+length_pairs <- inner_join(
+  answers_for_pairs %>% rename(vendor_row = vendor, len_row = answer_len),
+  answers_for_pairs %>% rename(vendor_col = vendor, len_col = answer_len),
+  by = "question_id",
+  relationship = "many-to-many"
+) %>%
+  filter(vendor_row != vendor_col) %>%
+  group_by(vendor_row, vendor_col) %>%
+  summarise(
+    n_questions = n(),
+    n_row_longer = sum(len_row > len_col),
+    win_rate = n_row_longer / n_questions,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    vendor_row = factor(vendor_row, levels = vendor_levels),
+    vendor_col = factor(vendor_col, levels = vendor_levels)
+  )
+```
+
+```{r length_win_matrix_table}
+length_pairs %>%
+  mutate(cell = sprintf("%.1f%% (%d/%d)",
+                        100 * win_rate, n_row_longer, n_questions)) %>%
+  select(vendor_row, vendor_col, cell) %>%
+  pivot_wider(names_from = vendor_col, values_from = cell, values_fill = "—",
+              names_sort = TRUE) %>%
+  arrange(vendor_row) %>%
+  rename(`Row vendor` = vendor_row) %>%
+  kable(caption = "Length-based win rate: P(row vendor's answer is longer than column vendor's), with (wins / paired questions).") %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
