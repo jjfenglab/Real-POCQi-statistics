@@ -1,9 +1,20 @@
 library(dplyr)
 
+MIN_SUBMISSION_TIME_SECONDS <- 10
+
+apply_inclusion_criteria <- function(qa_ratings,
+                                     min_submission_time = MIN_SUBMISSION_TIME_SECONDS) {
+  qa_ratings %>%
+    filter(!is.na(submission_time_seconds),
+           submission_time_seconds >= min_submission_time)
+}
+
 build_qa_ratings <- function(ratings, assignments, questions, users,
                              prior_users = NULL) {
   if (!is.null(prior_users)) {
-    assignments <- assignments %>% filter(!user_id %in% prior_users)
+    n_dropped <- sum(unique(assignments$user_id) %in% prior_users$id)
+    cat(sprintf("Dropped %d prior users from assignments\n", n_dropped))
+    assignments <- assignments %>% filter(!user_id %in% prior_users$id)
   }
   ratings %>%
     filter(!is.na(qa_assignment_id)) %>%

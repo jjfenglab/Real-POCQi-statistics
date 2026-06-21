@@ -23,7 +23,7 @@ source("data_helpers.R")
 # Load data
 
 Vendor identities are blinded by `blind_vendors.R`, which writes the
-`blinded_*.csv` files read below and a `secret_mapping.txt` file (kept
+`blinded_*.csv` files read below and a `secret_mapping.csv` file (kept
 outside the analysis pipeline). Run `Rscript blind_vendors.R` before
 knitting this document.
 
@@ -52,89 +52,91 @@ choice into a winner (vendor in slot A, vendor in slot B, or tie).
 qa_ratings <- build_qa_ratings(ratings, assignments, questions, users, prior_users = prior_users)
 ```
 
-# Table 1: Cohort summary
+# Table 1: Descriptive Statistics
 
 ```{r table1}
-completed_assignments <- assignments %>% filter(!is.na(completed_at))
+n_questions_total <- n_distinct(questions$id)
+n_specialties     <- n_distinct(questions$specialty)
 
-n_questions_total  <- n_distinct(questions$id)
-n_questions_used   <- n_distinct(qa_ratings$question_id)
-n_graders_assigned <- n_distinct(assignments$user_id)
-n_graders_rated    <- n_distinct(qa_ratings$user_id)
-n_specialties_rated      <- n_distinct(qa_ratings$specialty)
-n_specialties      <- n_distinct(questions$specialty)
+assignments_in_queue <- assignments %>%
+  { if (!is.null(prior_users)) filter(., !user_id %in% prior_users$id) else . } %>%
+  count(user_id, name = "n_assigned")
 
-per_user_completed <- completed_assignments %>%
-  count(user_id, name = "n_completed")
+summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
+  per_user_completed <- qa_ratings_subset %>%
+    distinct(user_id, qa_assignment_id) %>%
+    count(user_id, name = "n_completed")
 
-avg_completed_per_user <- per_user_completed %>%
-  summarise(
-    mean_n = mean(n_completed),
-    sd_n   = sd(n_completed),
-    median_n = median(n_completed),
-    min_n = min(n_completed),
-    max_n = max(n_completed)
+  avg_completed_per_user <- per_user_completed %>%
+    summarise(
+      mean_n   = mean(n_completed),
+      sd_n     = sd(n_completed),
+      median_n = median(n_completed),
+      min_n    = min(n_completed),
+      max_n    = max(n_completed)
+    )
+
+  submission_time_stats <- qa_ratings_subset %>%
+    filter(!is.na(submission_time_seconds)) %>%
+    summarise(
+      mean_t   = mean(submission_time_seconds),
+      sd_t     = sd(submission_time_seconds),
+      median_t = median(submission_time_seconds),
+      min_t    = min(submission_time_seconds),
+      max_t    = max(submission_time_seconds)
+    )
+
+  ratings_per_question_stats <- qa_ratings_subset %>%
+    count(question_id, name = "n_ratings") %>%
+    summarise(
+      mean_n   = mean(n_ratings),
+      sd_n     = sd(n_ratings),
+      median_n = median(n_ratings),
+      min_n    = min(n_ratings),
+      max_n    = max(n_ratings)
+    )
+
+  users_per_subversion <- qa_ratings_subset %>%
+    distinct(user_id) %>%
+    inner_join(users %>% select(id, subversion),
+               by = c("user_id" = "id")) %>%
+    count(subversion, name = "n_users") %>%
+    arrange(subversion)
+
+  subversion_summary <- paste(
+    sprintf("%s: %d", users_per_subversion$subversion,
+            users_per_subversion$n_users),
+    collapse = "; "
   )
 
-submission_time_stats <- qa_ratings %>%
-  filter(!is.na(submission_time_seconds)) %>%
-  summarise(
-    mean_t   = mean(submission_time_seconds),
-    sd_t     = sd(submission_time_seconds),
-    median_t = median(submission_time_seconds),
-    min_t    = min(submission_time_seconds),
-    max_t    = max(submission_time_seconds)
-  )
+  per_user_rate <- users %>%
+    filter(id %in% unique(qa_ratings_subset$user_id)) %>%
+    left_join(per_user_completed, by = c("id" = "user_id")) %>%
+    left_join(assignments_in_queue, by = c("id" = "user_id")) %>%
+    mutate(
+      n_completed     = coalesce(n_completed, 0L),
+      completion_rate = n_completed / n_assigned
+    )
 
-users_per_subversion <- qa_ratings %>%
-  distinct(user_id) %>%
-  inner_join(users %>% select(id, subversion),
-             by = c("user_id" = "id")) %>%
-  count(subversion, name = "n_users") %>%
-  arrange(subversion)
+  completion_rate_stats <- per_user_rate %>%
+    summarise(
+      mean_r = mean(completion_rate),
+      sd_r   = sd(completion_rate)
+    )
 
-subversion_summary <- paste(
-  sprintf("%s: %d", users_per_subversion$subversion,
-          users_per_subversion$n_users),
-  collapse = "; "
-)
-
-users_with_ratings <- unique(qa_ratings$user_id)
-
-per_user_rate <- users %>%
-  filter(id %in% users_with_ratings) %>%
-  left_join(per_user_completed, by = c("id" = "user_id")) %>%
-  mutate(
-    n_completed = coalesce(n_completed, 0L),
-    completion_rate = n_completed / required_task_count
-  )
-
-completion_rate_stats <- per_user_rate %>%
-  summarise(
-    mean_r = mean(completion_rate),
-    sd_r   = sd(completion_rate)
-  )
-
-table1 <- tibble(
-  Metric = c(
-    "Total questions in question bank",
-    "Total unique specialties in question bank",
-    "Questions with ≥1 rating",
-    "Specialties with ≥1 rating",
-    "Graders who submitted ≥1 rating",
-    "Graders with ≥1 rating per rendering mode",
-    "Completed assignments per grader (mean ± SD)",
-    "Completed assignments per grader (median [min, max])",
-    "Survey completion rate per grader (mean ± SD)",
-    "Submission time, seconds (mean ± SD)",
-    "Submission time, seconds (median [min, max])"
-  ),
-  Value = c(
+  c(
     n_questions_total,
     n_specialties,
-    n_questions_used,
-    n_specialties_rated,
-    n_graders_rated,
+    n_distinct(qa_ratings_subset$question_id),
+    sprintf("%.1f ± %.1f",
+            ratings_per_question_stats$mean_n,
+            ratings_per_question_stats$sd_n),
+    sprintf("%d [%d, %d]",
+            as.integer(ratings_per_question_stats$median_n),
+            as.integer(ratings_per_question_stats$min_n),
+            as.integer(ratings_per_question_stats$max_n)),
+    n_distinct(qa_ratings_subset$specialty),
+    n_distinct(qa_ratings_subset$user_id),
     subversion_summary,
     sprintf("%.1f ± %.1f",
             avg_completed_per_user$mean_n,
@@ -154,9 +156,31 @@ table1 <- tibble(
             as.integer(submission_time_stats$min_t),
             as.integer(submission_time_stats$max_t))
   )
+}
+
+qa_ratings_passing <- apply_inclusion_criteria(qa_ratings)
+
+table1 <- tibble(
+  Metric = c(
+    "Total questions in question bank",
+    "Total unique specialties in question bank",
+    "Questions with ≥1 rating",
+    "Ratings per question (mean ± SD)",
+    "Ratings per question (median [min, max])",
+    "Specialties with ≥1 rating",
+    "Graders who submitted ≥1 rating",
+    "Graders with ≥1 rating per rendering mode",
+    "Completed assignments per grader (mean ± SD)",
+    "Completed assignments per grader (median [min, max])",
+    "Survey completion rate per grader (mean ± SD)",
+    "Submission time, seconds (mean ± SD)",
+    "Submission time, seconds (median [min, max])"
+  ),
+  `All ratings` = summarise_cohort(qa_ratings, users, assignments_in_queue),
+  `Submission time ≥ 10s` = summarise_cohort(qa_ratings_passing, users, assignments_in_queue)
 )
 
-kable(table1, caption = "Table 1. Pilot cohort summary.") %>%
+kable(table1, caption = "Table 1. Pilot cohort summary, with and without submission-time exclusion.") %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
@@ -179,19 +203,36 @@ qa_ratings %>%
 ## Questions per specialty
 
 ```{r specialty}
-questions %>%
+specialty_counts <- questions %>%
   count(specialty, name = "n_questions") %>%
   arrange(desc(n_questions)) %>%
-  mutate(pct = sprintf("%.1f%%", 100 * n_questions / sum(n_questions))) %>%
-  kable(caption = "Number of questions per specialty (full question bank).") %>%
+  mutate(pct = sprintf("%.1f%%", 100 * n_questions / sum(n_questions)))
+
+specialty_counts %>%
+  kable(caption = sprintf(
+    "Number of questions per specialty (full question bank; %d unique specialties).",
+    nrow(specialty_counts)
+  )) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
 ```{r specialty_used}
-qa_ratings %>%
-  distinct(question_id, specialty) %>%
-  count(specialty, name = "n_questions_rated") %>%
-  arrange(desc(n_questions_rated)) %>%
+specialty_summary <- qa_ratings %>%
+  group_by(specialty) %>%
+  summarise(
+    n_questions_rated = n_distinct(question_id),
+    n_graders = n_distinct(user_id),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n_questions_rated))
+
+specialty_total <- tibble(
+  specialty = "Total",
+  n_questions_rated = n_distinct(qa_ratings$question_id),
+  n_graders = n_distinct(qa_ratings$user_id)
+)
+
+bind_rows(specialty_summary, specialty_total) %>%
   kable(caption = "Number of rated questions per specialty (pilot).") %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```

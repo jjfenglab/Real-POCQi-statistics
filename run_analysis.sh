@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Usage: run_analysis.sh [data_dir] [mapping_path]
 data_dir="${1:-pilot_data}"
-mapping_path="${data_dir}/secret_mapping.txt"
+mapping_path="${data_dir}/secret_mapping.csv"
 
 echo "## Blinding vendor identities..."
 Rscript blind_vendors.R "${data_dir}" "${mapping_path}"

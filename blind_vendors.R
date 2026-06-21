@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
 # Reads raw pilot CSVs, remaps vendor identities to A/B/C/D using a random
 # permutation, writes blinded_*.csv files that downstream analyses
-# (descriptives.Rmd) consume, and writes secret_mapping.txt with the true
-# identities. secret_mapping.txt MUST NOT be committed to version control.
+# (descriptives.Rmd) consume, and writes secret_mapping.csv with the true
+# identities. secret_mapping.csv MUST NOT be committed to version control.
 
 suppressPackageStartupMessages(library(tidyverse))
 
@@ -53,12 +53,10 @@ if (!is.null(prior_users)) {
   write_csv(prior_users, file.path(data_dir, "blinded_prior_users.csv"))
 }
 
-writeLines(
-  c(
-    "# Secret vendor mapping -- DO NOT COMMIT",
-    sprintf("# Generated: %s", format(Sys.time(), tz = "UTC", usetz = TRUE)),
-    "",
-    sprintf("%s -> %s", names(vendor_mapping), unname(vendor_mapping))
+write_csv(
+  tibble(
+    provider = names(vendor_mapping),
+    vendor   = unname(vendor_mapping)
   ),
   mapping_path
 )

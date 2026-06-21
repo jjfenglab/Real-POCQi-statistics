@@ -1,5 +1,5 @@
 ---
-title: "Pilot Data: Descriptive Statistics & Win Rates"
+title: "Statistical Analysis: Win Rates"
 author: "Jean Feng"
 date: "`r Sys.Date()`"
 output:
@@ -16,7 +16,6 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(knitr)
 library(kableExtra)
-library(lme4)
 library(broom.mixed)
 
 source("favorability_test.R")
@@ -26,9 +25,9 @@ source("data_helpers.R")
 # Load data
 
 Vendor identities are blinded by `blind_vendors.R`, which writes the
-`blinded_*.csv` files read below and a `secret_mapping.txt` file (kept
+`blinded_*.csv` files read below and a `secret_mapping.csv` file (kept
 outside the analysis pipeline). Run
-`Rscript blind_vendors.R pilot_data secret/secret_mapping.txt`
+`Rscript blind_vendors.R pilot_data secret/secret_mapping.csv`
 before knitting this document.
 
 ```{r load}
@@ -54,6 +53,7 @@ choice into a winner (vendor in slot A, vendor in slot B, or tie).
 
 ```{r analytic}
 qa_ratings <- build_qa_ratings(ratings, assignments, questions, users, prior_users = prior_users)
+qa_ratings <- apply_inclusion_criteria(qa_ratings)
 ```
 
 # Primary Analysis: Favorability Score Tests
