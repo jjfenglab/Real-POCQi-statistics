@@ -47,6 +47,87 @@ choice into a winner (vendor in slot A, vendor in slot B, or tie).
 qa_ratings <- build_qa_ratings(ratings, assignments, questions, users)
 ```
 
+# Primary Analysis: Favorability Score Tests
+
+One-vs-rest favorability score test for each vendor on the two primary
+outcome axes (accuracy and clinical_utility), restricted to the text-only
+rendering condition. Bootstrap resamples questions as clusters.
+
+```{r favorability_test_helpers}
+prepare_one_vs_rest_df <- function(df, vendor) {
+  df %>%
+    filter(slot_a_vendor == vendor | slot_b_vendor == vendor) %>%
+    mutate(
+      outcome = case_when(
+        winner == vendor ~ 1L,
+        loser == vendor ~ -1L,
+        is_tie ~ 0L
+      )
+    ) %>%
+    select(question_id, outcome)
+}
+
+run_favorability_analysis <- function(df, axis_name,
+                                      subversion_filter = "qa_text_only",
+                                      n_boot = 2000, seed = 42) {
+  set.seed(seed)
+
+  axis_df <- df %>%
+    filter(subversion == subversion_filter, axis == axis_name)
+
+  vendors <- sort(unique(c(axis_df$slot_a_vendor, axis_df$slot_b_vendor)))
+
+  map_dfr(vendors, function(v) {
+    test_df <- prepare_one_vs_rest_df(axis_df, v)
+
+    fav_score <- get_favorability_score(test_df$outcome)
+    test_result <- run_favorability_test(test_df, n_boot = n_boot)
+
+    tibble(
+      vendor = v,
+      wins = sum(test_df$outcome == 1),
+      ties = sum(test_df$outcome == 0),
+      losses = sum(test_df$outcome == -1),
+      n = nrow(test_df),
+      favorability = fav_score,
+      ci_lower = test_result$ci_lower,
+      ci_upper = test_result$ci_upper,
+      p_value = test_result$p_value
+    )
+  })
+}
+
+format_favorability_table <- function(results, axis_name) {
+  results %>%
+    mutate(
+      favorability = sprintf("%.1f%%", 100 * favorability),
+      ci_95 = sprintf("[%.1f%%, %.1f%%]", 100 * ci_lower, 100 * ci_upper),
+      p_value = sprintf("%.4f", p_value)
+    ) %>%
+    select(vendor, wins, ties, losses, n, favorability, ci_95, p_value) %>%
+    kable(caption = sprintf(
+      "One-vs-rest favorability score test (text-only, %s axis)",
+      axis_name
+    )) %>%
+    kable_styling(full_width = FALSE,
+                  bootstrap_options = c("striped", "hover"))
+}
+```
+
+## Clinical utility
+
+```{r favorability_test_clinical}
+run_favorability_analysis(qa_ratings, "clinical_utility") %>%
+  format_favorability_table("clinical utility")
+```
+
+## Accuracy
+
+```{r favorability_test_accuracy}
+run_favorability_analysis(qa_ratings, "accuracy") %>%
+  format_favorability_table("accuracy")
+```
+
 # Win-rate tables
 
 For every (assignment, axis) row we know which two vendors were compared
@@ -278,67 +359,3 @@ for (sv in subversions) {
 }
 ```
 
-# Primary Analysis: Favorability Score Tests
-
-One-vs-rest favorability score test for each vendor on the clinical_utility
-axis, restricted to the text-only rendering condition. Bootstrap resamples
-questions as clusters.
-
-```{r favorability_test}
-set.seed(42)
-
-text_only_clinical <- qa_ratings %>%
-  filter(subversion == "qa_text_only", axis == "clinical_utility")
-
-vendors <- sort(unique(c(text_only_clinical$slot_a_vendor,
-                         text_only_clinical$slot_b_vendor)))
-
-prepare_one_vs_rest_df <- function(df, vendor) {
-  involving_vendor <- df %>%
-    filter(slot_a_vendor == vendor | slot_b_vendor == vendor) %>%
-    mutate(
-      outcome = case_when(
-        winner == vendor ~ 1L,
-        loser == vendor ~ -1L,
-        is_tie ~ 0L
-      )
-    ) %>%
-    select(question_id, outcome)
-
-  involving_vendor
-}
-
-favorability_results <- map_dfr(vendors, function(v) {
-  test_df <- prepare_one_vs_rest_df(text_only_clinical, v)
-
-  wins <- sum(test_df$outcome == 1)
-  ties <- sum(test_df$outcome == 0)
-  losses <- sum(test_df$outcome == -1)
-  n <- nrow(test_df)
-
-  fav_score <- get_favorability_score(test_df$outcome)
-  test_result <- run_favorability_test(test_df, n_boot = 2000)
-
-  tibble(
-    vendor = v,
-    wins = wins,
-    ties = ties,
-    losses = losses,
-    n = n,
-    favorability = fav_score,
-    ci_lower = test_result$ci_lower,
-    ci_upper = test_result$ci_upper,
-    p_value = test_result$p_value
-  )
-})
-
-favorability_results %>%
-  mutate(
-    favorability = sprintf("%.1f%%", 100 * favorability),
-    ci_95 = sprintf("[%.1f%%, %.1f%%]", 100 * ci_lower, 100 * ci_upper),
-    p_value = sprintf("%.4f", p_value)
-  ) %>%
-  select(vendor, wins, ties, losses, n, favorability, ci_95, p_value) %>%
-  kable(caption = "One-vs-rest favorability score test (text-only, clinical utility axis)") %>%
-  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
-```

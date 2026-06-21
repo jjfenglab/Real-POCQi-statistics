@@ -7,10 +7,9 @@ get_favorability_score <- function(outcomes) {
   (wins - losses) / n
 }
 
-run_favorability_test <- function(df, n_boot = 1000, ci_level = 0.95) {
+run_favorability_test <- function(df, n_boot = 1000, ci_level = NULL) {
 
   stopifnot(all(c("question_id", "outcome") %in% names(df)))
-  stopifnot(ci_level > 0 && ci_level < 1)
 
   obs_fave <- get_favorability_score(df$outcome)
 
@@ -32,16 +31,20 @@ run_favorability_test <- function(df, n_boot = 1000, ci_level = 0.95) {
 
   p_val <- mean(abs(null_faves) >= abs(obs_fave))
 
-  boot_faves <- replicate(n_boot, {
-    sampled_questions <- sample(questions, n_questions, replace = TRUE)
-    boot_outcomes <- unlist(lapply(sampled_questions, function(q) {
-      df$outcome[df$question_id == q]
-    }))
-    get_favorability_score(boot_outcomes)
-  })
+  if (!is.null(ci_level)) {
+    boot_faves <- replicate(n_boot, {
+      sampled_questions <- sample(questions, n_questions, replace = TRUE)
+      boot_outcomes <- unlist(lapply(sampled_questions, function(q) {
+        df$outcome[df$question_id == q]
+      }))
+      get_favorability_score(boot_outcomes)
+    })
 
-  alpha <- 1 - ci_level
-  ci <- quantile(boot_faves, c(alpha / 2, 1 - alpha / 2), names = FALSE)
+    alpha <- 1 - ci_level
+    ci <- quantile(boot_faves, c(alpha / 2, 1 - alpha / 2), names = FALSE)
+  } else {
+    ci <- c(NULL, NULL)
+  }
 
   list(
     p_value = p_val,
@@ -101,7 +104,7 @@ calc_power <- function(n_obs, alt_distribution, alpha = 0.05,
     counts <- as.vector(rmultinom(1, n_obs, alt_distribution))
     outcomes <- rep(c(1, 0, -1), counts)
     df <- data.frame(question_id = seq_along(outcomes), outcome = outcomes)
-    result <- run_favorability_test(df, n_boot = n_boot)
+    result <- run_favorability_test(df, n_boot = n_boot, ci_level = NULL)
     result$p_value < alpha
   })
   mean(rejections)
