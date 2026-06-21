@@ -13,31 +13,22 @@ run_favorability_test <- function(df, n_boot = 1000, ci_level = NULL) {
 
   obs_fave <- get_favorability_score(df$outcome)
 
-  questions <- unique(df$question_id)
-  n_questions <- length(questions)
+  splits <- split(df$outcome, df$question_id)
+  n_questions <- length(splits)
 
   null_faves <- replicate(n_boot, {
-    sampled_questions <- sample(questions, n_questions, replace = TRUE)
-
-    boot_outcomes <- unlist(lapply(sampled_questions, function(q) {
-      q_outcomes <- df$outcome[df$question_id == q]
-      sapply(q_outcomes, function(o) {
-        if (o == 0) 0 else sample(c(-1, 1), 1)
-      })
-    }))
-
-    get_favorability_score(boot_outcomes)
+    idx <- sample.int(n_questions, n_questions, replace = TRUE)
+    boot_outcomes <- unlist(splits[idx], use.names = FALSE)
+    flipped <- boot_outcomes * sample(c(-1, 1), length(boot_outcomes), replace = TRUE)
+    mean(flipped)
   })
 
   p_val <- mean(abs(null_faves) >= abs(obs_fave))
 
   if (!is.null(ci_level)) {
     boot_faves <- replicate(n_boot, {
-      sampled_questions <- sample(questions, n_questions, replace = TRUE)
-      boot_outcomes <- unlist(lapply(sampled_questions, function(q) {
-        df$outcome[df$question_id == q]
-      }))
-      get_favorability_score(boot_outcomes)
+      idx <- sample.int(n_questions, n_questions, replace = TRUE)
+      mean(unlist(splits[idx], use.names = FALSE))
     })
 
     alpha <- 1 - ci_level
