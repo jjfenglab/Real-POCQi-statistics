@@ -7,6 +7,8 @@ output:
     toc: true
     toc_float: true
     df_print: paged
+params:
+  data_dir: null
 ---
 
 ```{r setup, include=FALSE}
@@ -26,7 +28,8 @@ outside the analysis pipeline). Run `Rscript blind_vendors.R` before
 knitting this document.
 
 ```{r load}
-data_dir <- "pilot_data"
+if (is.null(params$data_dir)) stop("`data_dir` parameter is required")
+data_dir <- params$data_dir
 
 assignments <- read_csv(file.path(data_dir, "blinded_qa_assignments.csv"))
 questions   <- read_csv(file.path(data_dir, "blinded_qa_questions.csv"))
@@ -158,9 +161,9 @@ qa_ratings %>%
   filter(!is.na(submission_time_seconds)) %>%
   ggplot(aes(x = submission_time_seconds)) +
   geom_histogram(bins = 40, fill = "steelblue", color = "white") +
-  scale_x_continuous(labels = scales::comma) +
+  scale_x_log10(labels = scales::comma) +
   labs(
-    x = "Submission time (seconds)",
+    x = "Submission time (seconds, log scale)",
     y = "Number of ratings",
     title = "Distribution of submission time per rating"
   ) +
