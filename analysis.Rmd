@@ -166,6 +166,17 @@ and the chosen winner. The matrix below reports, for each ordered pair
 axes. Ties are *included* in the denominator (and count as 0 wins for
 both vendors), so cell[row, col] + cell[col, row] + tie-rate = 100%.
 
+These matrices, the win-margin tables below, and the Plackett-Luce
+rankings are all restricted to the `qa_text_only` and
+`qa_text_citations` rendering modes (the `qa_full_render` condition is
+excluded).
+
+```{r included_subversions}
+included_subversions <- c("qa_text_only", "qa_text_citations")
+qa_ratings_included <- qa_ratings %>%
+  filter(subversion %in% included_subversions)
+```
+
 ## Win-rate matrix (aggregate)
 
 ```{r winrate_matrix}
@@ -214,7 +225,7 @@ build_win_matrix <- function(df, n_boot = 1000) {
 set.seed(42)
 
 kable(
-  build_win_matrix(qa_ratings),
+  build_win_matrix(qa_ratings_included),
   caption = paste0(
     "Row vendor's win rate vs. column vendor (ties included in ",
     "denominator). Cell = win% [95% CI] (wins / all comparisons). ",
@@ -235,7 +246,7 @@ axes <- sort(unique(qa_ratings$axis))
 
 for (ax in axes) {
   cat(sprintf("\n\n### Axis: %s\n\n", ax))
-  mat <- build_win_matrix(qa_ratings %>% filter(axis == ax))
+  mat <- build_win_matrix(qa_ratings_included %>% filter(axis == ax))
   print(
     kable(
       mat,
@@ -253,15 +264,13 @@ for (ax in axes) {
 
 ## Win-rate matrices per rendering mode
 
-Same construction as the pooled matrix, repeated within each rendering
-mode (`subversion` in `users.csv`).
+Same construction as the pooled matrix, repeated within each of the
+two included rendering modes (`subversion` in `users.csv`).
 
 ```{r winrate_matrix_per_subversion, results='asis'}
-subversions <- sort(unique(qa_ratings$subversion))
-
-for (sv in subversions) {
+for (sv in included_subversions) {
   cat(sprintf("\n\n### Rendering mode: %s\n\n", sv))
-  mat <- build_win_matrix(qa_ratings %>% filter(subversion == sv))
+  mat <- build_win_matrix(qa_ratings_included %>% filter(subversion == sv))
   print(
     kable(
       mat,
@@ -337,7 +346,7 @@ build_margin_matrix <- function(df) {
 
 ```{r margin_matrix}
 kable(
-  build_margin_matrix(qa_ratings),
+  build_margin_matrix(qa_ratings_included),
   caption = paste0(
     "Mean Likert-unit margin the row vendor won by vs. the column ",
     "vendor (ties included as 0). Cell = mean (net/N)."
@@ -352,7 +361,7 @@ kable(
 ```{r margin_matrix_per_axis, results='asis'}
 for (ax in axes) {
   cat(sprintf("\n\n### Axis: %s\n\n", ax))
-  mat <- build_margin_matrix(qa_ratings %>% filter(axis == ax))
+  mat <- build_margin_matrix(qa_ratings_included %>% filter(axis == ax))
   print(
     kable(
       mat,
@@ -371,9 +380,9 @@ for (ax in axes) {
 ## Win-margin matrices per rendering mode
 
 ```{r margin_matrix_per_subversion, results='asis'}
-for (sv in subversions) {
+for (sv in included_subversions) {
   cat(sprintf("\n\n### Rendering mode: %s\n\n", sv))
-  mat <- build_margin_matrix(qa_ratings %>% filter(subversion == sv))
+  mat <- build_margin_matrix(qa_ratings_included %>% filter(subversion == sv))
   print(
     kable(
       mat,
@@ -387,5 +396,263 @@ for (sv in subversions) {
                     bootstrap_options = c("striped", "hover"))
   )
 }
+```
+
+# Exploratory analysis: Plackett-Luce rankings with ties
+
+We fit a Plackett-Luce model with a tie parameter using the
+`PlackettLuce` package (Turner et al. 2020). Like the Rao-Kupper model,
+this extends Bradley-Terry to handle ties, but with a different
+functional form: ties are modelled by a single parameter $\delta_2$
+that multiplies the geometric mean of the two vendors' worths
+(Davidson 1970; Hunter 2004):
+
+$$
+P(i \succ j) = \frac{\alpha_i}{\alpha_i + \alpha_j + \delta_2 \sqrt{\alpha_i \alpha_j}}, \qquad
+P(\text{tie}) = \frac{\delta_2 \sqrt{\alpha_i \alpha_j}}{\alpha_i + \alpha_j + \delta_2 \sqrt{\alpha_i \alpha_j}}.
+$$
+
+Larger $\delta_2$ implies more ties; $\delta_2 = 0$ recovers
+Bradley-Terry. We bootstrap by resampling questions to get 95%
+confidence intervals on the normalized worth
+$\tilde{\alpha}_i = \alpha_i / \sum_k \alpha_k$ and on $\delta_2$. All
+fits below are restricted to the `qa_text_only` and
+`qa_text_citations` rendering modes (the `qa_full_render` condition is
+excluded).
+
+```{r pl_helpers}
+library(PlackettLuce)
+
+build_pl_rankings <- function(df, vendors) {
+  K <- length(vendors)
+  n <- nrow(df)
+  R <- matrix(0L, nrow = n, ncol = K, dimnames = list(NULL, vendors))
+  a_idx <- match(df$slot_a_vendor, vendors)
+  b_idx <- match(df$slot_b_vendor, vendors)
+  win_a <- !df$is_tie & df$winner == df$slot_a_vendor
+  win_b <- !df$is_tie & df$winner == df$slot_b_vendor
+  R[cbind(seq_len(n), a_idx)] <- ifelse(df$is_tie, 1L,
+                                  ifelse(win_a, 1L, 2L))
+  R[cbind(seq_len(n), b_idx)] <- ifelse(df$is_tie, 1L,
+                                  ifelse(win_b, 1L, 2L))
+  as.rankings(R)
+}
+
+fit_pl <- function(df, vendors = NULL) {
+  if (is.null(vendors)) {
+    vendors <- sort(unique(c(df$slot_a_vendor, df$slot_b_vendor)))
+  }
+  R   <- build_pl_rankings(df, vendors)
+  fit <- PlackettLuce(R)
+
+  cc        <- coef(fit, log = FALSE)
+  tie_param <- if ("tie2" %in% names(cc)) unname(cc["tie2"]) else NA_real_
+  worth     <- cc[setdiff(names(cc), "tie2")][vendors]
+
+  list(
+    vendors = vendors,
+    worth   = unname(worth) / sum(worth),
+    tie     = tie_param,
+    fit     = fit
+  )
+}
+
+bootstrap_pl <- function(df, n_boot = 500, ci_level = 0.95, seed = 42) {
+  set.seed(seed)
+  df_clean <- df %>% filter(!is.na(choice))
+  vendors  <- sort(unique(c(df_clean$slot_a_vendor, df_clean$slot_b_vendor)))
+  K        <- length(vendors)
+
+  fit <- fit_pl(df_clean, vendors)
+
+  q_to_rows <- split(seq_len(nrow(df_clean)),
+                     as.character(df_clean$question_id))
+  questions <- names(q_to_rows)
+
+  boot_worth <- matrix(NA_real_, nrow = n_boot, ncol = K)
+  boot_tie   <- rep(NA_real_, n_boot)
+
+  for (b in seq_len(n_boot)) {
+    samp_q  <- sample(questions, length(questions), replace = TRUE)
+    rows    <- unlist(q_to_rows[samp_q], use.names = FALSE)
+    boot_df <- df_clean[rows, ]
+    if (!all(vendors %in% c(boot_df$slot_a_vendor, boot_df$slot_b_vendor))) next
+    boot_fit <- tryCatch(fit_pl(boot_df, vendors), error = function(e) NULL)
+    if (is.null(boot_fit)) next
+    boot_worth[b, ] <- boot_fit$worth
+    boot_tie[b]     <- boot_fit$tie
+  }
+
+  alpha    <- (1 - ci_level) / 2
+  worth_ci <- t(apply(boot_worth, 2, quantile,
+                      probs = c(alpha, 1 - alpha), na.rm = TRUE))
+  tie_ci   <- quantile(boot_tie,
+                       probs = c(alpha, 1 - alpha), na.rm = TRUE)
+
+  estimates <- tibble(
+    vendor   = vendors,
+    worth    = fit$worth,
+    ci_lower = worth_ci[, 1],
+    ci_upper = worth_ci[, 2]
+  ) %>%
+    arrange(desc(worth)) %>%
+    mutate(rank = row_number()) %>%
+    select(rank, everything())
+
+  list(
+    estimates      = estimates,
+    tie            = fit$tie,
+    tie_ci         = tie_ci,
+    n_comparisons  = nrow(df_clean),
+    n_questions    = length(questions),
+    n_boot         = n_boot,
+    n_boot_success = sum(!is.na(boot_tie))
+  )
+}
+
+format_pl_table <- function(pl_result, caption) {
+  caption_full <- sprintf(
+    "%s — δ₂ = %.2f [%.2f, %.2f]; N = %d comparisons across %d questions",
+    caption,
+    pl_result$tie,
+    pl_result$tie_ci[1],
+    pl_result$tie_ci[2],
+    pl_result$n_comparisons,
+    pl_result$n_questions
+  )
+  pl_result$estimates %>%
+    mutate(worth = sprintf("%.3f [%.3f, %.3f]",
+                           worth, ci_lower, ci_upper)) %>%
+    select(rank, vendor, worth) %>%
+    kable(caption   = caption_full,
+          col.names = c("Rank", "Vendor",
+                        "Normalized worth π̃ [95% CI]")) %>%
+    kable_styling(full_width = FALSE,
+                  bootstrap_options = c("striped", "hover"))
+}
+```
+
+## Pooled across axes
+
+```{r pl_pooled}
+pl_pooled <- bootstrap_pl(qa_ratings_included)
+format_pl_table(
+  pl_pooled,
+  "Plackett-Luce rankings, pooled across rating axes"
+)
+```
+
+## Per axis
+
+```{r pl_per_axis, results='asis'}
+for (ax in axes) {
+  cat(sprintf("\n\n### Axis: %s\n\n", ax))
+  pl_axis <- bootstrap_pl(qa_ratings_included %>% filter(axis == ax))
+  print(format_pl_table(
+    pl_axis,
+    sprintf("Plackett-Luce rankings on axis = %s", ax)
+  ))
+}
+```
+
+## Cross-check: Davidson model via BradleyTerry2 + gnm
+
+The Plackett-Luce model with ties of size two (above) is the standard
+Davidson (1970) tie model. As a sanity check we refit it via
+`BradleyTerry2::GenDavidson()` — a non-linear term plugged into
+`gnm::gnm()` on the trinomial (win / tie / loss) expansion of the
+contests — and confirm we recover the same normalized worths and tie
+parameter. BradleyTerry2 parameterises the tie via `tie.max`, the
+logit of the maximum tie probability; the equivalent PL δ₂ is
+$\delta_2 = 2\,\text{plogis}(\text{tie.max}) / (1 - \text{plogis}(\text{tie.max}))$.
+
+```{r davidson_helpers}
+suppressMessages({
+  library(BradleyTerry2)
+  library(gnm)
+})
+
+fit_davidson <- function(df) {
+  df      <- df %>% filter(!is.na(choice))
+  vendors <- sort(unique(c(df$slot_a_vendor, df$slot_b_vendor)))
+  win_a   <- !df$is_tie & df$winner == df$slot_a_vendor
+  win_b   <- !df$is_tie & df$winner == df$slot_b_vendor
+
+  expanded <- data.frame(
+    match_id = factor(rep(seq_len(nrow(df)), each = 3)),
+    player1  = factor(rep(df$slot_a_vendor, each = 3), levels = vendors),
+    player2  = factor(rep(df$slot_b_vendor, each = 3), levels = vendors),
+    result   = rep(c(1L, 0L, -1L), times = nrow(df)),
+    count    = as.integer(c(t(cbind(win_a, df$is_tie, win_b))))
+  )
+
+  fit <- gnm(
+    count ~ GenDavidson(result == 1, result == 0, result == -1,
+                        player1, player2,
+                        home.adv = NULL, tie.max = ~1) - 1,
+    eliminate = match_id, family = poisson, data = expanded,
+    verbose = FALSE
+  )
+
+  cc        <- coef(fit)
+  tie_max   <- as.numeric(cc[grep("tie\\.max", names(cc))[1]])
+  p_tie_max <- plogis(tie_max)
+  delta_2   <- 2 * p_tie_max / (1 - p_tie_max)
+
+  non_ability <- c("tie.max", "tie.scale", "tie.mode", "home.adv")
+  ability_cc  <- cc[!names(cc) %in% non_ability]
+  log_alpha   <- setNames(rep(NA_real_, length(vendors)), vendors)
+  for (v in vendors) {
+    idx <- which(endsWith(names(ability_cc), v))
+    if (length(idx) > 0) log_alpha[v] <- as.numeric(ability_cc[idx[1]])
+  }
+  log_alpha[is.na(log_alpha)] <- 0  # gnm aliases the reference level
+  alpha <- exp(log_alpha)
+
+  list(
+    vendors   = vendors,
+    worth     = unname(alpha / sum(alpha)),
+    delta_2   = delta_2,
+    p_tie_max = p_tie_max,
+    fit       = fit
+  )
+}
+```
+
+### Comparison: pooled across axes
+
+```{r davidson_compare_pooled}
+dav_pooled <- fit_davidson(qa_ratings_included)
+
+tibble(
+  vendor   = pl_pooled$estimates$vendor,
+  pl_worth = pl_pooled$estimates$worth
+) %>%
+  left_join(
+    tibble(vendor = dav_pooled$vendors, dav_worth = dav_pooled$worth),
+    by = "vendor"
+  ) %>%
+  arrange(desc(pl_worth)) %>%
+  mutate(
+    rank      = row_number(),
+    diff      = pl_worth - dav_worth,
+    pl_worth  = sprintf("%.4f", pl_worth),
+    dav_worth = sprintf("%.4f", dav_worth),
+    diff      = sprintf("%+.4f", diff)
+  ) %>%
+  select(rank, vendor, pl_worth, dav_worth, diff) %>%
+  kable(
+    caption = sprintf(
+      paste0("PlackettLuce vs. Davidson (BradleyTerry2 + gnm), ",
+             "pooled across axes. δ₂(PL) = %.3f, ",
+             "δ₂(Davidson) = %.3f."),
+      pl_pooled$tie, dav_pooled$delta_2
+    ),
+    col.names = c("Rank", "Vendor",
+                  "Worth (PlackettLuce)", "Worth (Davidson)",
+                  "PL − Davidson")
+  ) %>%
+  kable_styling(full_width = FALSE,
+                bootstrap_options = c("striped", "hover"))
 ```
 
