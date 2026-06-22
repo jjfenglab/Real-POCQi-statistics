@@ -17,15 +17,15 @@ run python3 extract_answer_lengths.py "${data_dir}"
 run Rscript blind_vendors.R "${data_dir}" "${mapping_path}"
 
 echo "## Knitting descriptives.Rmd..."
-echo "   -> Outputs: descriptives.html, .RData, .h5"
+echo "   -> Outputs: descriptives.html, .RData"
 run Rscript -e "rmarkdown::render('descriptives.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='descriptives'), output_dir='${output_dir}')"
 
 echo "## Knitting analysis.Rmd (bootstrap by question)..."
-echo "   -> Outputs: analysis_by_question.html, .RData, .h5"
+echo "   -> Outputs: analysis_by_question.html, .RData"
 run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='analysis_by_question'), output_file='analysis_by_question.html', output_dir='${output_dir}')"
 
 echo "## Knitting analysis.Rmd (bootstrap by user)..."
-echo "   -> Outputs: analysis_by_user.html, .RData, .h5"
+echo "   -> Outputs: analysis_by_user.html, .RData"
 run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='analysis_by_user'), output_file='analysis_by_user.html', output_dir='${output_dir}')"
 
 # # Example code for running analysis where you drop only a single vendor from the analysis
