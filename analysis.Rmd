@@ -9,6 +9,8 @@ output:
     df_print: paged
 params:
   data_dir: null
+  bootstrap_by: "question"
+  drop_vendor: null
 ---
 
 ```{r setup, include=FALSE}
@@ -20,6 +22,14 @@ library(broom.mixed)
 
 source("favorability_test.R")
 source("data_helpers.R")
+```
+
+# Analysis parameters
+
+```{r params, echo=FALSE, results='asis'}
+cat(sprintf("- **Data directory:** `%s`\n", params$data_dir))
+cat(sprintf("- **Bootstrap by:** %s\n", params$bootstrap_by))
+cat(sprintf("- **Drop vendor:** %s\n", ifelse(is.null(params$drop_vendor), "none", params$drop_vendor)))
 ```
 
 # Load data
@@ -55,6 +65,14 @@ choice into a winner (vendor in slot A, vendor in slot B, or tie).
 ```{r analytic}
 qa_ratings <- build_qa_ratings(ratings, assignments, questions, users, prior_users = prior_users)
 qa_ratings <- apply_inclusion_criteria(qa_ratings)
+
+if (!is.null(params$drop_vendor)) {
+  stopifnot(params$drop_vendor %in% c("A", "B", "C", "D"))
+  qa_ratings <- qa_ratings %>%
+    filter(slot_a_vendor != params$drop_vendor,
+           slot_b_vendor != params$drop_vendor)
+  cat(sprintf("Dropped vendor %s from analysis\n", params$drop_vendor))
+}
 ```
 
 # Primary Analysis: Win difference tests
@@ -74,12 +92,13 @@ prepare_one_vs_rest_df <- function(df, vendor) {
         is_tie ~ 0L
       )
     ) %>%
-    select(question_id, outcome)
+    select(question_id, user_id, outcome)
 }
 
 run_favorability_analysis <- function(df, axis_name,
                                       subversion_filter = "qa_text_only",
-                                      n_boot = 2000, seed = 42) {
+                                      n_boot = 10000, seed = 42,
+                                      bootstrap_by = params$bootstrap_by) {
   set.seed(seed)
 
   axis_df <- df %>%
@@ -91,7 +110,8 @@ run_favorability_analysis <- function(df, axis_name,
     test_df <- prepare_one_vs_rest_df(axis_df, v)
 
     fav_score <- get_favorability_score(test_df$outcome)
-    test_result <- run_favorability_test(test_df, n_boot = n_boot, ci_level=0.95)
+    test_result <- run_favorability_test(test_df, n_boot = n_boot, ci_level=0.95,
+                                         bootstrap_by = bootstrap_by)
 
     tibble(
       vendor = v,
@@ -179,7 +199,8 @@ qa_ratings_included <- qa_ratings %>%
 ```
 
 ```{r winrate_matrix}
-build_win_matrix <- function(df, n_boot = 1000) {
+build_win_matrix <- function(df, n_boot = 10000,
+                             bootstrap_by = params$bootstrap_by) {
   df %>%
     mutate(
       row_vendor = slot_a_vendor,
@@ -194,12 +215,13 @@ build_win_matrix <- function(df, n_boot = 1000) {
           row_win = !is_tie & winner == slot_b_vendor
         )
     ) %>%
-    select(question_id, row_vendor, col_vendor, row_win) %>%
+    select(question_id, user_id, row_vendor, col_vendor, row_win) %>%
     group_by(row_vendor, col_vendor) %>%
     group_modify(~ {
       res <- run_win_rate_ci(
-        data.frame(question_id = .x$question_id, row_win = .x$row_win),
-        n_boot = n_boot
+        data.frame(question_id = .x$question_id, user_id = .x$user_id,
+                   row_win = .x$row_win),
+        n_boot = n_boot, bootstrap_by = bootstrap_by
       )
       tibble(
         n        = res$n,
@@ -407,11 +429,12 @@ prepare_one_vs_rest_df_with_lengths <- function(df, vendor) {
         is_tie ~ 0L
       )
     ) %>%
-    select(question_id, outcome, vendor_len, comparator_len)
+    select(question_id, user_id, outcome, vendor_len, comparator_len)
 }
 
 run_length_stratified_analysis <- function(df, axis_name,
-                                           n_boot = 2000, seed = 42) {
+                                           n_boot = 10000, seed = 42,
+                                           bootstrap_by = params$bootstrap_by) {
   set.seed(seed)
 
   axis_df <- df %>% filter(axis == axis_name)
@@ -425,11 +448,12 @@ run_length_stratified_analysis <- function(df, axis_name,
       stratum_df <- base_df %>%
         filter(if (stratum == "longer") vendor_len > comparator_len
                                   else vendor_len < comparator_len) %>%
-        select(question_id, outcome)
+        select(question_id, user_id, outcome)
 
       fav_score   <- get_favorability_score(stratum_df$outcome)
       test_result <- run_favorability_test(stratum_df,
-                                           n_boot = n_boot, ci_level = 0.95)
+                                           n_boot = n_boot, ci_level = 0.95,
+                                           bootstrap_by = bootstrap_by)
 
       tibble(
         vendor       = v,
