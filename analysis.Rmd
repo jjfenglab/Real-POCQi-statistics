@@ -361,8 +361,8 @@ whether the vendor under test produced a *longer* or *shorter* answer
 than its comparator (character length from `blinded_qa_answers.csv`).
 Unlike the primary analysis, rendering conditions are **pooled** here
 (all `subversion` values included). The comparison count drops because
-each comparison goes into exactly one stratum; equal-length answers are
-not expected and raise an error if encountered.
+each comparison goes into exactly one stratum; comparisons where the two
+vendors produced exactly equal-length answers are dropped.
 
 ```{r length_stratified_helpers}
 answer_lengths <- read_csv(file.path(data_dir, "blinded_qa_answers.csv")) %>%
@@ -380,6 +380,19 @@ qa_ratings_with_lengths <- qa_ratings %>%
     by = c("question_id", "slot_b_vendor")
   )
 
+equal_length_pairs <- qa_ratings_with_lengths %>%
+  filter(slot_a_answer_len == slot_b_answer_len) %>%
+  distinct(question_id, slot_a_vendor, slot_b_vendor)
+
+n_questions_equal_length <- n_distinct(equal_length_pairs$question_id)
+
+writeLines(sprintf(
+  "Equal-length vendor pairs: %d (across %d unique questions).",
+  nrow(equal_length_pairs), n_questions_equal_length
+), con = stderr())
+```
+
+```{r}
 prepare_one_vs_rest_df_with_lengths <- function(df, vendor) {
   df %>%
     filter(slot_a_vendor == vendor | slot_b_vendor == vendor) %>%
@@ -405,14 +418,8 @@ run_length_stratified_analysis <- function(df, axis_name,
   vendors <- sort(unique(c(axis_df$slot_a_vendor, axis_df$slot_b_vendor)))
 
   map_dfr(vendors, function(v) {
-    base_df <- prepare_one_vs_rest_df_with_lengths(axis_df, v)
-
-    if (any(base_df$vendor_len == base_df$comparator_len)) {
-      stop(sprintf(
-        "Equal answer lengths for vendor %s on axis %s — unexpected.",
-        v, axis_name
-      ))
-    }
+    base_df <- prepare_one_vs_rest_df_with_lengths(axis_df, v) %>%
+      filter(vendor_len != comparator_len)
 
     map_dfr(c("longer", "shorter"), function(stratum) {
       stratum_df <- base_df %>%

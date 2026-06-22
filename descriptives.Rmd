@@ -265,6 +265,23 @@ ggplot(ratings_per_question, aes(x = mean_n_per_axis)) +
   theme_minimal()
 ```
 
+## Completed assignments per grader
+
+```{r completed_per_grader_plot}
+completed_per_grader <- qa_ratings %>%
+  distinct(user_id, qa_assignment_id) %>%
+  count(user_id, name = "n_completed")
+
+ggplot(completed_per_grader, aes(x = n_completed)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "white") +
+  labs(
+    x = "Completed assignments per grader",
+    y = "Number of graders",
+    title = "Distribution of completed assignments per grader"
+  ) +
+  theme_minimal()
+```
+
 ## Questions per specialty
 
 ```{r specialty}
