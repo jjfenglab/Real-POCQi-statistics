@@ -9,6 +9,11 @@ apply_inclusion_criteria <- function(qa_ratings,
            submission_time_seconds >= min_submission_time)
 }
 
+get_eligible_users <- function(users) {
+  # Filter only down to ratings from users assigned to either qa_text_only or qa_text_citations subversions
+  users %>% filter(subversion %in% c("qa_text_only", "qa_text_citations"))
+}
+
 build_qa_ratings <- function(ratings, assignments, questions, users,
                              prior_users = NULL) {
   if (!is.null(prior_users)) {
@@ -16,6 +21,9 @@ build_qa_ratings <- function(ratings, assignments, questions, users,
     cat(sprintf("Dropped %d prior users from assignments\n", n_dropped))
     assignments <- assignments %>% filter(!user_id %in% prior_users$id)
   }
+
+  eligible_users <- get_eligible_users(users)
+
   ratings %>%
     filter(!is.na(qa_assignment_id)) %>%
     inner_join(
@@ -29,7 +37,7 @@ build_qa_ratings <- function(ratings, assignments, questions, users,
       by = "question_id"
     ) %>%
     inner_join(
-      users %>% select(user_id = id, subversion),
+      eligible_users %>% select(user_id = id, subversion),
       by = "user_id"
     ) %>%
     mutate(

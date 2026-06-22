@@ -38,6 +38,7 @@ assignments <- read_csv(file.path(data_dir, "blinded_qa_assignments.csv"))
 questions   <- read_csv(file.path(data_dir, "blinded_qa_questions.csv"))
 ratings     <- read_csv(file.path(data_dir, "blinded_ratings.csv"))
 users       <- read_csv(file.path(data_dir, "blinded_users.csv"))
+users <- get_eligible_users(users)
 prior_users_path <- file.path(data_dir, "blinded_prior_users.csv")
 prior_users <- if (file.exists(prior_users_path)) {
   read_csv(prior_users_path)
