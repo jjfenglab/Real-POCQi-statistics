@@ -1,18 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+run() {
+  printf '+'
+  printf ' %q' "$@"
+  echo
+  "$@"
+}
+
 # Usage: run_analysis.sh [data_dir] [mapping_path]
 data_dir="${1:-pilot_data}"
 mapping_path="${data_dir}/secret_mapping.csv"
+output_dir="${data_dir}/output"
 
-echo "## Extracting answer lengths from JSONL..."
-python3 extract_answer_lengths.py "${data_dir}"
+run mkdir -p "${output_dir}"
 
-echo "## Blinding vendor identities..."
-Rscript blind_vendors.R "${data_dir}" "${mapping_path}"
+run python3 extract_answer_lengths.py "${data_dir}"
+run Rscript blind_vendors.R "${data_dir}" "${mapping_path}"
 
 echo "## Knitting descriptives.Rmd..."
-Rscript -e "rmarkdown::render('descriptives.Rmd', params=list(data_dir='${data_dir}'), output_dir='${data_dir}')"
+echo "   -> Outputs: descriptives.html, .RData"
+run Rscript -e "rmarkdown::render('descriptives.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}'), output_dir='${output_dir}')"
 
-echo "## Knitting analysis.Rmd..."
-Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}'), output_dir='${data_dir}')"
+echo "## Knitting analysis.Rmd (bootstrap by question)..."
+echo "   -> Outputs: analysis_by_question.html, .RData"
+run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}'), output_file='analysis_by_question.html', output_dir='${output_dir}')"
+
+echo "## Knitting analysis.Rmd (bootstrap by user)..."
+echo "   -> Outputs: analysis_by_user.html, .RData"
+run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}'), output_file='analysis_by_user.html', output_dir='${output_dir}')"
+
+# # Example code for running analysis where you drop only a single vendor from the analysis
+# echo "## Knitting analysis.Rmd (bootstrap by question, drop vendor B)..."
+# run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', drop_vendor='B'), output_file='analysis_by_question_drop_B.html', output_dir='${output_dir}')"

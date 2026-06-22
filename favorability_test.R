@@ -7,17 +7,21 @@ get_favorability_score <- function(outcomes) {
   (wins - losses) / n
 }
 
-run_favorability_test <- function(df, n_boot = 1000, ci_level = NULL) {
+run_favorability_test <- function(df, n_boot = 1000, ci_level = NULL,
+                                  bootstrap_by = c("question", "user")) {
 
-  stopifnot(all(c("question_id", "outcome") %in% names(df)))
+  bootstrap_by <- match.arg(bootstrap_by)
+  cluster_col <- if (bootstrap_by == "question") "question_id" else "user_id"
+
+  stopifnot(all(c(cluster_col, "outcome") %in% names(df)))
 
   obs_fave <- get_favorability_score(df$outcome)
 
-  splits <- split(df$outcome, df$question_id)
-  n_questions <- length(splits)
+  splits <- split(df$outcome, df[[cluster_col]])
+  n_clusters <- length(splits)
 
   null_faves <- replicate(n_boot, {
-    idx <- sample.int(n_questions, n_questions, replace = TRUE)
+    idx <- sample.int(n_clusters, n_clusters, replace = TRUE)
     boot_outcomes <- unlist(splits[idx], use.names = FALSE)
     flipped <- boot_outcomes * sample(c(-1, 1), length(boot_outcomes), replace = TRUE)
     mean(flipped)
@@ -27,7 +31,7 @@ run_favorability_test <- function(df, n_boot = 1000, ci_level = NULL) {
 
   if (!is.null(ci_level)) {
     boot_faves <- replicate(n_boot, {
-      idx <- sample.int(n_questions, n_questions, replace = TRUE)
+      idx <- sample.int(n_clusters, n_clusters, replace = TRUE)
       mean(unlist(splits[idx], use.names = FALSE))
     })
 
@@ -45,9 +49,13 @@ run_favorability_test <- function(df, n_boot = 1000, ci_level = NULL) {
   )
 }
 
-run_win_rate_ci <- function(df, n_boot = 1000, ci_level = 0.95) {
+run_win_rate_ci <- function(df, n_boot = 1000, ci_level = 0.95,
+                            bootstrap_by = c("question", "user")) {
 
-  stopifnot(all(c("question_id", "row_win") %in% names(df)))
+  bootstrap_by <- match.arg(bootstrap_by)
+  cluster_col <- if (bootstrap_by == "question") "question_id" else "user_id"
+
+  stopifnot(all(c(cluster_col, "row_win") %in% names(df)))
   stopifnot(ci_level > 0 && ci_level < 1)
 
   n_obs <- nrow(df)
@@ -64,15 +72,15 @@ run_win_rate_ci <- function(df, n_boot = 1000, ci_level = 0.95) {
     ))
   }
 
-  splits <- split(as.integer(df$row_win), df$question_id)
-  q_n    <- vapply(splits, length, integer(1))
-  q_wins <- vapply(splits, sum, integer(1))
-  n_questions <- length(q_n)
+  splits <- split(as.integer(df$row_win), df[[cluster_col]])
+  cluster_n    <- vapply(splits, length, integer(1))
+  cluster_wins <- vapply(splits, sum, integer(1))
+  n_clusters <- length(cluster_n)
 
   boot_rates <- replicate(n_boot, {
-    idx <- sample.int(n_questions, n_questions, replace = TRUE)
-    total_n    <- sum(q_n[idx])
-    total_wins <- sum(q_wins[idx])
+    idx <- sample.int(n_clusters, n_clusters, replace = TRUE)
+    total_n    <- sum(cluster_n[idx])
+    total_wins <- sum(cluster_wins[idx])
     if (total_n == 0) NA_real_ else total_wins / total_n
   })
 
