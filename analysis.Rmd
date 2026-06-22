@@ -9,6 +9,7 @@ output:
     df_print: paged
 params:
   data_dir: null
+  output_dir: null
   bootstrap_by: "question"
   drop_vendor: null
 ---
@@ -28,6 +29,7 @@ source("data_helpers.R")
 
 ```{r params, echo=FALSE, results='asis'}
 cat(sprintf("- **Data directory:** `%s`\n", params$data_dir))
+cat(sprintf("- **Output directory:** `%s`\n", ifelse(is.null(params$output_dir), params$data_dir, params$output_dir)))
 cat(sprintf("- **Bootstrap by:** %s\n", params$bootstrap_by))
 cat(sprintf("- **Drop vendor:** %s\n", ifelse(is.null(params$drop_vendor), "none", params$drop_vendor)))
 ```
@@ -665,3 +667,17 @@ for (ax in axes) {
 }
 ```
 
+# Save everything
+```{r save_outputs}
+output_file <- knitr::opts_knit$get("rmarkdown.output.file")
+if (is.null(output_file)) {
+  output_file <- "analysis.html"
+}
+base_name <- tools::file_path_sans_ext(basename(output_file))
+save_dir <- if (is.null(params$output_dir)) params$data_dir else params$output_dir
+
+# Save workspace for R users
+rdata_path <- file.path(save_dir, paste0(base_name, ".RData"))
+save.image(file = rdata_path)
+message("Saved RData to: ", rdata_path)
+```

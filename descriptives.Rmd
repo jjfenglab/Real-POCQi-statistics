@@ -9,6 +9,7 @@ output:
     df_print: paged
 params:
   data_dir: null
+  output_dir: null
 ---
 
 ```{r setup, include=FALSE}
@@ -449,4 +450,19 @@ length_pairs %>%
     "with (wins / rated comparisons)."
   )) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+# Save everything
+```{r save_outputs}
+output_file <- knitr::opts_knit$get("rmarkdown.output.file")
+if (is.null(output_file)) {
+  output_file <- "descriptives.html"
+}
+base_name <- tools::file_path_sans_ext(basename(output_file))
+save_dir <- if (is.null(params$output_dir)) params$data_dir else params$output_dir
+
+# Save workspace for R users
+rdata_path <- file.path(save_dir, paste0(base_name, ".RData"))
+save.image(file = rdata_path)
+message("Saved RData to: ", rdata_path)
 ```
