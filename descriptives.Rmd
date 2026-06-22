@@ -48,6 +48,7 @@ prior_users <- if (file.exists(prior_users_path)) {
 
 Join ratings to assignments, attach question specialty, and decode the
 choice into a winner (vendor in slot A, vendor in slot B, or tie).
+A rating corresponds to a single evaluation of two answers for a given question along some axis.
 
 ```{r analytic}
 qa_ratings <- build_qa_ratings(ratings, assignments, questions, users, prior_users = prior_users)
@@ -64,21 +65,20 @@ assignments_in_queue <- assignments %>%
   count(user_id, name = "n_assigned")
 
 summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
-  mean_ratings_per_axis <- qa_ratings_subset %>%
-    count(axis, name = "n_ratings") %>%
-    summarise(mean_n = mean(n_ratings)) %>%
-    pull(mean_n)
+  n_axes <- n_distinct(qa_ratings_subset$axis)
+
+  mean_ratings_per_axis <- nrow(qa_ratings_subset) / n_axes
 
   ratings_per_vendor <- qa_ratings_subset %>%
-    distinct(qa_assignment_id, slot_a_vendor, slot_b_vendor) %>%
     pivot_longer(c(slot_a_vendor, slot_b_vendor),
                  names_to = "slot", values_to = "vendor") %>%
-    count(vendor, name = "n_comparisons") %>%
+    count(vendor, name = "n_total") %>%
+    mutate(mean_n_per_axis = n_total / n_axes) %>%
     arrange(vendor)
 
   ratings_per_vendor_summary <- paste(
-    sprintf("%s: %d", ratings_per_vendor$vendor,
-            ratings_per_vendor$n_comparisons),
+    sprintf("%s: %.0f", ratings_per_vendor$vendor,
+            ratings_per_vendor$mean_n_per_axis),
     collapse = "; "
   )
 
@@ -121,12 +121,13 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
 
   ratings_per_question_stats <- qa_ratings_subset %>%
     count(question_id, name = "n_ratings") %>%
+    mutate(mean_n_per_axis = n_ratings / n_axes) %>%
     summarise(
-      mean_n   = mean(n_ratings),
-      sd_n     = sd(n_ratings),
-      median_n = median(n_ratings),
-      min_n    = min(n_ratings),
-      max_n    = max(n_ratings)
+      mean_n   = mean(mean_n_per_axis),
+      sd_n     = sd(mean_n_per_axis),
+      median_n = median(mean_n_per_axis),
+      min_n    = min(mean_n_per_axis),
+      max_n    = max(mean_n_per_axis)
     )
 
   users_per_subversion <- qa_ratings_subset %>%
@@ -167,10 +168,10 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
     sprintf("%.1f ± %.1f",
             ratings_per_question_stats$mean_n,
             ratings_per_question_stats$sd_n),
-    sprintf("%d [%d, %d]",
-            as.integer(ratings_per_question_stats$median_n),
-            as.integer(ratings_per_question_stats$min_n),
-            as.integer(ratings_per_question_stats$max_n)),
+    sprintf("%.1f [%.1f, %.1f]",
+            ratings_per_question_stats$median_n,
+            ratings_per_question_stats$min_n,
+            ratings_per_question_stats$max_n),
     n_distinct(qa_ratings_subset$specialty),
     n_distinct(qa_ratings_subset$user_id),
     subversion_summary,
@@ -201,11 +202,11 @@ table1 <- tibble(
     "Total questions in question bank",
     "Total unique specialties in question bank",
     "Questions with ≥1 rating",
-    "Total ratings collected (mean across evaluation dimensions)",
-    "Ratings collected per blinded vendor (comparisons)",
+    "Total ratings collected",
+    "Ratings collected per blinded vendor",
     "Unique questions evaluated per blinded vendor",
-    "Ratings per question (mean ± SD)",
-    "Ratings per question (median [min, max])",
+    "Num ratings per question (mean ± SD)",
+    "Num ratings per question (median [min, max])",
     "Specialties with ≥1 rating",
     "Graders who submitted ≥1 rating",
     "Graders with ≥1 rating per rendering mode",
@@ -219,7 +220,12 @@ table1 <- tibble(
   `Submission time ≥ 10s` = summarise_cohort(qa_ratings_passing, users, assignments_in_queue)
 )
 
-kable(table1, caption = "Table 1. Pilot cohort summary, with and without submission-time exclusion.") %>%
+table1_caption <- paste(
+  "Table 1. Pilot cohort summary, with and without submission-time",
+  "exclusion. All rating counts are averaged across evaluation dimensions."
+)
+
+kable(table1, caption = table1_caption) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
