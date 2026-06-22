@@ -246,6 +246,25 @@ qa_ratings %>%
   theme_minimal()
 ```
 
+## Ratings per question
+
+```{r ratings_per_question_plot}
+n_axes <- n_distinct(qa_ratings$axis)
+
+ratings_per_question <- qa_ratings %>%
+  count(question_id, name = "n_ratings") %>%
+  mutate(mean_n_per_axis = n_ratings / n_axes)
+
+ggplot(ratings_per_question, aes(x = mean_n_per_axis)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "white") +
+  labs(
+    x = "Number of ratings per question (averaged across axes)",
+    y = "Number of questions",
+    title = "Distribution of ratings per question"
+  ) +
+  theme_minimal()
+```
+
 ## Questions per specialty
 
 ```{r specialty}
