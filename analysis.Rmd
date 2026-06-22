@@ -10,6 +10,7 @@ output:
 params:
   data_dir: null
   output_dir: null
+  output_name: "analysis"
   bootstrap_by: "question"
   drop_vendor: null
 ---
@@ -669,15 +670,8 @@ for (ax in axes) {
 
 # Save everything
 ```{r save_outputs}
-output_file <- knitr::opts_knit$get("rmarkdown.output.file")
-if (is.null(output_file)) {
-  output_file <- "analysis.html"
-}
-base_name <- tools::file_path_sans_ext(basename(output_file))
-save_dir <- if (is.null(params$output_dir)) params$data_dir else params$output_dir
-
 # Save workspace for R users
-rdata_path <- file.path(save_dir, paste0(base_name, ".RData"))
+rdata_path <- file.path(params$output_dir, paste0(params$output_name, ".RData"))
 save.image(file = rdata_path)
 message("Saved RData to: ", rdata_path)
 ```
