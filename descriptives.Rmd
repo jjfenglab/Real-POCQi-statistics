@@ -37,6 +37,7 @@ assignments <- read_csv(file.path(data_dir, "blinded_qa_assignments.csv"))
 questions   <- read_csv(file.path(data_dir, "blinded_qa_questions.csv"))
 qa_answers   <- read_csv(file.path(data_dir, "blinded_qa_answers.csv"))
 ratings     <- read_csv(file.path(data_dir, "blinded_ratings.csv"))
+user_registrations  <- read_csv(file.path(data_dir, "recruitment_combined.csv"))
 users       <- read_csv(file.path(data_dir, "blinded_users.csv"))
 users <- get_eligible_users(users)
 prior_users_path <- file.path(data_dir, "blinded_prior_users.csv")
@@ -232,7 +233,32 @@ kable(table1, caption = table1_caption) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
-## Submission time distribution
+# Interrater Agreement
+
+Agreement is calculated among raters who evaluated the same question with the
+same vendor pair (regardless of slot order). Ratings are standardized to a
+canonical winner (first vendor alphabetically, second vendor, or tie).
+
+```{r interrater_agreement}
+irr_passing <- calculate_interrater_agreement(qa_ratings_passing, n_boot = 1000)
+```
+
+```{r irr_per_axis_table}
+irr_per_axis_table <- tibble(
+  Axis = names(irr_passing$per_axis),
+  `N groups` = sapply(irr_passing$per_axis, function(x) x$n_pairs),
+  `Percent agreement` = sapply(irr_passing$per_axis, function(x) {
+    sprintf("%.1f%% [%.1f%%, %.1f%%]",
+            100 * x$pct_agreement, 100 * x$pct_ci[1], 100 * x$pct_ci[2])
+  })
+)
+
+kable(irr_per_axis_table,
+      caption = "Interrater agreement by evaluation axis (submission time ≥ 10s only).") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+# Submission time distribution
 
 ```{r submission_time_plot}
 qa_ratings %>%
@@ -248,7 +274,7 @@ qa_ratings %>%
   theme_minimal()
 ```
 
-## Ratings per question
+# Ratings per question
 
 ```{r ratings_per_question_plot}
 n_axes <- n_distinct(qa_ratings$axis)
@@ -267,7 +293,7 @@ ggplot(ratings_per_question, aes(x = mean_n_per_axis)) +
   theme_minimal()
 ```
 
-## Completed assignments per grader
+# Completed assignments per grader
 
 ```{r completed_per_grader_plot}
 completed_per_grader <- qa_ratings %>%
@@ -284,7 +310,7 @@ ggplot(completed_per_grader, aes(x = n_completed)) +
   theme_minimal()
 ```
 
-## Questions per specialty
+# Questions per specialty
 
 ```{r specialty}
 specialty_counts <- questions %>%
@@ -390,7 +416,7 @@ ggplot(rated_answer_lengths, aes(x = vendor, y = answer_len, fill = vendor)) +
   theme_minimal()
 ```
 
-## Length-based win-rate matrix
+# Length-based win-rate matrix
 
 For each ordered pair of vendors (row, column), the cell reports the
 fraction of questions on which the row vendor's answer is strictly
@@ -450,6 +476,25 @@ length_pairs %>%
     "P(row vendor's answer is longer than column vendor's),",
     "with (wins / rated comparisons)."
   )) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+# OE Status of Graders
+
+```{r oe_status}
+graders_with_ratings <- qa_ratings %>%
+  distinct(user_id) %>%
+  inner_join(users %>% select(id, email), by = c("user_id" = "id")) %>%
+  left_join(user_registrations %>% select(Email, `OE Status`),
+            by = c("email" = "Email"))
+
+oe_status_counts <- graders_with_ratings %>%
+  count(`OE Status`, name = "n_graders") %>%
+  mutate(pct = sprintf("%.1f%%", 100 * n_graders / sum(n_graders)))
+
+kable(oe_status_counts,
+      col.names = c("OE Status", "N Graders", "Percentage"),
+      caption = "OE Status distribution among graders with ≥1 rating.") %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
