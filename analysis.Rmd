@@ -13,6 +13,7 @@ params:
   output_name: "analysis"
   bootstrap_by: "question"
   drop_vendor: null
+  user_stratification: null
 ---
 
 ```{r setup, include=FALSE}
@@ -32,6 +33,7 @@ source("data_helpers.R")
 cat(sprintf("- **Data directory:** `%s`\n", params$data_dir))
 cat(sprintf("- **Output directory:** `%s`\n", ifelse(is.null(params$output_dir), params$data_dir, params$output_dir)))
 cat(sprintf("- **Bootstrap by:** %s\n", params$bootstrap_by))
+cat(sprintf("- **User stratification:** %s\n", ifelse(is.null(params$user_stratification), "none", params$user_stratification)))
 cat(sprintf("- **Drop vendor:** %s\n", ifelse(is.null(params$drop_vendor), "none", params$drop_vendor)))
 ```
 
@@ -50,8 +52,9 @@ data_dir <- params$data_dir
 assignments <- read_csv(file.path(data_dir, "blinded_qa_assignments.csv"))
 questions   <- read_csv(file.path(data_dir, "blinded_qa_questions.csv"))
 ratings     <- read_csv(file.path(data_dir, "blinded_ratings.csv"))
+user_registrations  <- read_csv(file.path(data_dir, "recruitment_combined.csv"))
 users       <- read_csv(file.path(data_dir, "blinded_users.csv"))
-users <- get_eligible_users(users)
+users <- get_eligible_users(users, user_registrations, user_stratification=params$user_stratification)
 prior_users_path <- file.path(data_dir, "blinded_prior_users.csv")
 prior_users <- if (file.exists(prior_users_path)) {
   read_csv(prior_users_path)
