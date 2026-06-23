@@ -97,7 +97,10 @@ apply_inclusion_criteria <- function(qa_ratings,
 }
 
 get_eligible_users <- function(users, user_registrations = NULL, user_stratification = NULL) {
-  eligible <- users %>% filter(subversion %in% c("qa_text_only", "qa_text_citations"))
+  test_email_patterns <- c("eval\\.test$", "example\\.com$", "openevidence\\.com$")
+  eligible <- users %>%
+    filter(subversion %in% c("qa_text_only", "qa_text_citations"),
+           !grepl(paste(test_email_patterns, collapse = "|"), email, ignore.case = TRUE))
 
   if (!is.null(user_stratification) && !is.null(user_registrations)) {
     eligible_emails <- user_registrations %>%
