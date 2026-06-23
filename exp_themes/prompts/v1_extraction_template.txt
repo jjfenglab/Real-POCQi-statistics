@@ -1,0 +1,17 @@
+You are an expert at categorizing clinical questions. Analyze the following clinical question and extract keyphrases describing what type of question it is.
+
+Focus on identifying the type(s) of clinical information being requested (e.g., treatment, diagnosis, mechanism, drug interaction, prognosis, epidemiology, differential diagnosis, clinical presentation, dosing, monitoring, contraindication, side effect, workup/evaluation, guideline/recommendation, imaging interpretation, lab interpretation, procedure technique, risk factors, prevention, screening, patient education)
+
+Be specific and use concise keyphrases. Only extract what is clearly present in the question.
+
+Question:
+{note_text}
+
+Output format:
+{{
+    "question_types": [
+        "treatment",
+        "first-line therapy",
+        ...
+        ]
+}}

@@ -1,0 +1,202 @@
+import os
+from os.path import join as path_join
+
+from dotenv import load_dotenv
+from nestly import Nest
+from nestly.scons import SConsWrap
+from SCons.Script import Import
+
+load_dotenv()
+
+# For SCons - Import env from parent
+Import("env")
+localenv = env.Clone()
+
+# Available prompt versions for question type extraction
+PROMPT_VERSIONS_DICT = {
+     "v1": {
+         "limit": 200,  # Start small for testing
+         "seed": 42,
+         "max_char": 10000,
+         "llm_model": "us.anthropic.claude-sonnet-4-20250514-v1:0",
+     },
+}
+PROMPT_VERSIONS = list(PROMPT_VERSIONS_DICT.keys())
+
+# Tagging configuration - uses cleaned categories to tag all questions
+TAGGING_DICT = {
+    "v1": {
+        "limit": None,  # Process all questions
+        "seed": None,
+        "max_char": 10000,
+        "llm_model": "us.anthropic.claude-sonnet-4-20250514-v1:0",
+        "response_model": "QuestionTagging",
+    },
+}
+
+# Cache configuration for LLM calls
+CACHE_FILE = "cache.db"
+
+# Set up nestly state
+nest = SConsWrap(Nest(), localenv["output"], alias_environment=localenv)
+
+# LLM Configuration
+LLM_DICT = {
+    "batch_size": 10,
+    "max_retries": 1,
+    "temperature": {
+        "us.anthropic.claude-sonnet-4-20250514-v1:0": 1,
+    }
+}
+
+# Clustering parameters
+CLUSTERING_CONFIGS = {
+    "default": {
+        "n_clusters": 15,  # More clusters for question types
+        "embedding_model": "all-MiniLM-L6-v2",
+    },
+}
+
+# Source data paths
+DATA_DIR = "data_6-21-3-56-00pm-nohb"
+QUESTIONS_CSV = f"{DATA_DIR}/qa_questions.csv"
+ASSIGNMENTS_CSV = f"{DATA_DIR}/qa_assignments.csv"
+RATINGS_CSV = f"{DATA_DIR}/blinded_ratings.csv"
+
+# First, filter to rated questions
+@nest.add_target_with_env(localenv)
+def filter_rated_questions(env, outdir, c):
+    """Filter questions to only those with at least one rating"""
+    cmd = [
+        "python src/filter_rated_questions.py",
+        f"--questions-csv {QUESTIONS_CSV}",
+        f"--assignments-csv {ASSIGNMENTS_CSV}",
+        f"--ratings-csv {RATINGS_CSV}",
+        "--output-csv ${TARGETS[0]}",
+    ]
+
+    sources = []
+    targets = [path_join(outdir, "rated_questions.csv")]
+
+    return env.Command(targets, sources, " ".join(map(str, cmd)))
+
+nest.add("prompt_version", PROMPT_VERSIONS_DICT, label_func=lambda c: "prompt_%s" % c)
+
+@nest.add_target_with_env(localenv)
+def extract_question_types(env, outdir, c):
+    """Extract question type keyphrases from clinical questions"""
+    prompt_template_path = f"exp_themes/prompts/{c['prompt_version']}_extraction_template.txt"
+    llm_model = PROMPT_VERSIONS_DICT[c["prompt_version"]]["llm_model"]
+
+    cmd = [
+        "python src/extract_themes.py",
+        "--input-csv ${SOURCES[0]}",
+        "--output-csv ${TARGETS[0]}",
+        "--prompt-template", prompt_template_path,
+        "--cache-db", CACHE_FILE,
+        "--log-file ${TARGETS[1]}",
+        "--limit 1",
+        "--model", llm_model,
+        "--batch-size", LLM_DICT["batch_size"],
+        "--max-retries", LLM_DICT["max_retries"],
+        "--temperature", LLM_DICT["temperature"][llm_model],
+        "--limit", PROMPT_VERSIONS_DICT[c["prompt_version"]]["limit"],
+        "--random-seed", PROMPT_VERSIONS_DICT[c["prompt_version"]]["seed"],
+        "--max-char", PROMPT_VERSIONS_DICT[c["prompt_version"]]["max_char"],
+        "--response-model", "QuestionTypeExtraction",
+        "--id-column", "id",
+    ]
+
+    sources = c["filter_rated_questions"][0]  # rated_questions.csv
+    targets = [
+        path_join(outdir, "extracted_types.csv"),
+        path_join(outdir, "log_extraction.txt"),
+    ]
+
+    return env.Command(targets, sources, " ".join(map(str, cmd)))
+
+nest.add("clustering_config", list(CLUSTERING_CONFIGS.keys()))
+
+@nest.add_target_with_env(localenv)
+def cluster_types(env, outdir, c):
+    """Cluster extracted question type keyphrases using BERTopic"""
+    clustering_config = CLUSTERING_CONFIGS[c["clustering_config"]]
+
+    targets = [
+        path_join(outdir, "type_clusters.json"),
+    ]
+
+    cmd = [
+        "python src/cluster_themes.py",
+        "--input-csv ${SOURCES[0]}",
+        "--output-json ${TARGETS[0]}",
+        "--n-clusters", clustering_config["n_clusters"],
+        "--embedding-model", clustering_config["embedding_model"],
+    ]
+
+    sources = c["extract_question_types"][0]  # extracted_types.csv
+
+    return env.Command(targets, sources, " ".join(map(str, cmd)))
+
+"""
+After clustering, manually review and clean up the clusters:
+Read the clusters created in
+  exp_themes/_output/prompt_v1/default/type_clusters.json
+Then create cleaned category lists for tagging.
+
+Then run the tagging step below.
+"""
+
+nest.add("tagging_prompt_version", list(TAGGING_DICT.keys()), label_func=lambda c: "tagging_%s" % c)
+
+@nest.add_target_with_env(localenv)
+def tag_questions(env, outdir, c):
+    """Tag all questions with predefined categories from cleaned clusters"""
+    prompt_template_path = f"exp_themes/prompts/{c['tagging_prompt_version']}_tagging_template.txt"
+    tagging_config = TAGGING_DICT[c["tagging_prompt_version"]]
+    llm_model = tagging_config["llm_model"]
+
+    cmd = [
+        "python src/extract_themes.py",
+        "--input-csv ${SOURCES[0]}",
+        "--output-csv ${TARGETS[0]}",
+        "--prompt-template", prompt_template_path,
+        "--cache-db", CACHE_FILE,
+        "--log-file ${TARGETS[1]}",
+        "--model", llm_model,
+        "--batch-size", LLM_DICT["batch_size"],
+        "--max-retries", LLM_DICT["max_retries"],
+        "--temperature", LLM_DICT["temperature"][llm_model],
+        "--max-char", tagging_config["max_char"],
+        "--response-model", tagging_config["response_model"],
+        "--id-column", "id",
+    ]
+
+    # Add optional limit/seed if specified
+    if tagging_config["limit"] is not None:
+        cmd.extend(["--limit", tagging_config["limit"]])
+    if tagging_config["seed"] is not None:
+        cmd.extend(["--random-seed", tagging_config["seed"]])
+
+    sources = c["filter_rated_questions"][0]  # rated_questions.csv (all rated questions)
+    targets = [
+        path_join(outdir, "tagged_questions.csv"),
+        path_join(outdir, "log_tagging.txt"),
+    ]
+
+    return env.Command(targets, sources, " ".join(map(str, cmd)))
+
+
+@nest.add_target_with_env(localenv)
+def plot_question_types(env, outdir, c):
+    """Plot distribution of primary question types"""
+    cmd = [
+        "python src/plot_question_types.py",
+        "--input-csv ${SOURCES[0]}",
+        "--output-plot ${TARGETS[0]}",
+    ]
+
+    sources = c["tag_questions"][0]  # tagged_questions.csv
+    targets = [path_join(outdir, "question_type_distribution.png")]
+
+    return env.Command(targets, sources, " ".join(map(str, cmd)))
