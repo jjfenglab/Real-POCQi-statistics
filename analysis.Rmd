@@ -154,36 +154,36 @@ format_favorability_table <- function(results, axis_name,
 ## Clinical utility
 
 ```{r favorability_test_clinical}
-run_favorability_analysis(qa_ratings, "clinical_utility") %>%
-  format_favorability_table("clinical utility")
+favorability_clinical <- run_favorability_analysis(qa_ratings, "clinical_utility")
+format_favorability_table(favorability_clinical, "clinical utility")
 ```
 
 ## Accuracy
 
 ```{r favorability_test_accuracy}
-run_favorability_analysis(qa_ratings, "accuracy") %>%
-  format_favorability_table("accuracy")
+favorability_accuracy <- run_favorability_analysis(qa_ratings, "accuracy")
+format_favorability_table(favorability_accuracy, "accuracy")
 ```
 
 ## Authoritativeness
 
 ```{r favorability_test_authoritativeness}
-run_favorability_analysis(qa_ratings, "authoritativeness") %>%
-  format_favorability_table("authoritativeness")
+favorability_authoritativeness <- run_favorability_analysis(qa_ratings, "authoritativeness")
+format_favorability_table(favorability_authoritativeness, "authoritativeness")
 ```
 
 ## Completeness
 
 ```{r favorability_test_completeness}
-run_favorability_analysis(qa_ratings, "completeness") %>%
-  format_favorability_table("completeness")
+favorability_completeness <- run_favorability_analysis(qa_ratings, "completeness")
+format_favorability_table(favorability_completeness, "completeness")
 ```
 
 ## Verifiability
 
 ```{r favorability_test_verifiability}
-run_favorability_analysis(qa_ratings, "verifiability") %>%
-  format_favorability_table("verifiability")
+favorability_verifiability <- run_favorability_analysis(qa_ratings, "verifiability")
+format_favorability_table(favorability_verifiability, "verifiability")
 ```
 
 # Secondary analysis: Win-rate tables
@@ -258,10 +258,12 @@ Same construction as the pooled matrix, repeated within each rating axis.
 set.seed(42)
 
 axes <- sort(unique(qa_ratings$axis))
+winrate_matrices_per_axis <- list()
 
 for (ax in axes) {
   cat(sprintf("\n\n### Axis: %s\n\n", ax))
   mat <- build_win_matrix(qa_ratings_included %>% filter(axis == ax))
+  winrate_matrices_per_axis[[ax]] <- mat
   print(
     kable(
       mat,
@@ -286,46 +288,46 @@ analysis covers `qa_text_only`).
 ## Clinical utility
 
 ```{r favorability_test_citations_clinical}
-run_favorability_analysis(qa_ratings, "clinical_utility",
-                          subversion_filter = "qa_text_citations") %>%
-  format_favorability_table("clinical utility",
-                            rendering = "qa_text_citations")
+favorability_citations_clinical <- run_favorability_analysis(
+  qa_ratings, "clinical_utility", subversion_filter = "qa_text_citations")
+format_favorability_table(favorability_citations_clinical, "clinical utility",
+                          rendering = "qa_text_citations")
 ```
 
 ## Accuracy
 
 ```{r favorability_test_citations_accuracy}
-run_favorability_analysis(qa_ratings, "accuracy",
-                          subversion_filter = "qa_text_citations") %>%
-  format_favorability_table("accuracy",
-                            rendering = "qa_text_citations")
+favorability_citations_accuracy <- run_favorability_analysis(
+  qa_ratings, "accuracy", subversion_filter = "qa_text_citations")
+format_favorability_table(favorability_citations_accuracy, "accuracy",
+                          rendering = "qa_text_citations")
 ```
 
 ## Authoritativeness
 
 ```{r favorability_test_citations_authoritativeness}
-run_favorability_analysis(qa_ratings, "authoritativeness",
-                          subversion_filter = "qa_text_citations") %>%
-  format_favorability_table("authoritativeness",
-                            rendering = "qa_text_citations")
+favorability_citations_authoritativeness <- run_favorability_analysis(
+  qa_ratings, "authoritativeness", subversion_filter = "qa_text_citations")
+format_favorability_table(favorability_citations_authoritativeness, "authoritativeness",
+                          rendering = "qa_text_citations")
 ```
 
 ## Completeness
 
 ```{r favorability_test_citations_completeness}
-run_favorability_analysis(qa_ratings, "completeness",
-                          subversion_filter = "qa_text_citations") %>%
-  format_favorability_table("completeness",
-                            rendering = "qa_text_citations")
+favorability_citations_completeness <- run_favorability_analysis(
+  qa_ratings, "completeness", subversion_filter = "qa_text_citations")
+format_favorability_table(favorability_citations_completeness, "completeness",
+                          rendering = "qa_text_citations")
 ```
 
 ## Verifiability
 
 ```{r favorability_test_citations_verifiability}
-run_favorability_analysis(qa_ratings, "verifiability",
-                          subversion_filter = "qa_text_citations") %>%
-  format_favorability_table("verifiability",
-                            rendering = "qa_text_citations")
+favorability_citations_verifiability <- run_favorability_analysis(
+  qa_ratings, "verifiability", subversion_filter = "qa_text_citations")
+format_favorability_table(favorability_citations_verifiability, "verifiability",
+                          rendering = "qa_text_citations")
 ```
 
 # Sensitivity analysis: Strict win-rate tables
@@ -363,9 +365,12 @@ qa_ratings_strict <- apply_strict_win_definition(qa_ratings_included)
 ```{r strict_winrate_matrix_per_axis, results='asis'}
 set.seed(42)
 
+strict_winrate_matrices_per_axis <- list()
+
 for (ax in axes) {
   cat(sprintf("\n\n### Axis: %s\n\n", ax))
   mat <- build_win_matrix(qa_ratings_strict %>% filter(axis == ax))
+  strict_winrate_matrices_per_axis[[ax]] <- mat
   print(
     kable(
       mat,
@@ -502,40 +507,41 @@ format_length_stratified_table <- function(results, axis_name) {
 ## Clinical utility
 
 ```{r length_stratified_clinical}
-run_length_stratified_analysis(qa_ratings_with_lengths,
-                               "clinical_utility") %>%
-  format_length_stratified_table("clinical utility")
+length_stratified_clinical <- run_length_stratified_analysis(
+  qa_ratings_with_lengths, "clinical_utility")
+format_length_stratified_table(length_stratified_clinical, "clinical utility")
 ```
 
 ## Accuracy
 
 ```{r length_stratified_accuracy}
-run_length_stratified_analysis(qa_ratings_with_lengths, "accuracy") %>%
-  format_length_stratified_table("accuracy")
+length_stratified_accuracy <- run_length_stratified_analysis(
+  qa_ratings_with_lengths, "accuracy")
+format_length_stratified_table(length_stratified_accuracy, "accuracy")
 ```
 
 ## Authoritativeness
 
 ```{r length_stratified_authoritativeness}
-run_length_stratified_analysis(qa_ratings_with_lengths,
-                               "authoritativeness") %>%
-  format_length_stratified_table("authoritativeness")
+length_stratified_authoritativeness <- run_length_stratified_analysis(
+  qa_ratings_with_lengths, "authoritativeness")
+format_length_stratified_table(length_stratified_authoritativeness, "authoritativeness")
 ```
 
 ## Completeness
 
 ```{r length_stratified_completeness}
-run_length_stratified_analysis(qa_ratings_with_lengths,
-                               "completeness") %>%
-  format_length_stratified_table("completeness")
+length_stratified_completeness <- run_length_stratified_analysis(
+  qa_ratings_with_lengths, "completeness")
+format_length_stratified_table(length_stratified_completeness, "completeness")
 ```
 
 ## Verifiability
 
 ```{r length_stratified_verifiability}
-run_length_stratified_analysis(qa_ratings_with_lengths,
-                               "verifiability") %>%
-  format_length_stratified_table("verifiability")
+length_stratified_verifiability <- run_length_stratified_analysis(
+  qa_ratings_with_lengths, "verifiability")
+format_length_stratified_table(length_stratified_verifiability, "verifiability")
 ```
 
 
@@ -661,9 +667,12 @@ format_davidson_table <- function(dav, caption) {
 
 
 ```{r davidson_per_axis, results='asis'}
+davidson_fits_per_axis <- list()
+
 for (ax in axes) {
   cat(sprintf("\n\n### Axis: %s\n\n", ax))
   dav_axis <- fit_davidson(qa_ratings_included %>% filter(axis == ax))
+  davidson_fits_per_axis[[ax]] <- dav_axis
   print(format_davidson_table(
     dav_axis,
     sprintf("Davidson rankings on axis = %s", ax)
