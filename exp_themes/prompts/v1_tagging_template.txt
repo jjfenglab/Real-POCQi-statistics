@@ -1,0 +1,52 @@
+You are an expert at categorizing clinical questions. Classify the following clinical question into predefined categories.
+
+## Question Types (select PRIMARY and any SECONDARY types that apply):
+
+* Tag: PROCEDURES_AND_OUTCOMES
+Theme: Procedural Interventions & Clinical Outcomes
+Includes: Questions about procedure technique, procedural indications, medical device usage (e.g., insulin delivery methods), efficacy, complications, and epidemiological outcomes of interventions.
+
+* Tag: PREVENTION_AND_GUIDELINES
+Theme: Preventative Medicine & Clinical Guidelines
+Includes: Questions regarding consensus recommendations, preventative measures, and risk factor modification.
+
+* Tag: EVALUATION_AND_MANAGEMENT
+Theme: Patient Evaluation & Ongoing Management
+Includes: Questions about the general clinical pathway, longitudinal management, patient monitoring, screening protocols, and initial workup.
+
+* Tag: EVIDENCE_AND_RATIONALE
+Theme: Evidence-Based Rationale
+Includes: Questions seeking the underlying literature, justification, or level of evidence supporting a specific clinical decision or mechanism.
+
+* Tag: ANATOMY_AND_PATHOPHYSIOLOGY
+Theme: Pathophysiology & Anatomical Foundations
+Includes: Questions focusing on foundational medical sciences, structural anatomy, vascular anatomy, disease etiology, and pathophysiology.
+
+* Tag: DIAGNOSIS_AND_PROGNOSIS
+Theme: Diagnostic Reasoning & Prognostication
+Includes: Questions involving the cognitive synthesis of forming a differential diagnosis, determining clinical significance, and predicting patient prognosis.
+
+* Tag: DIAGNOSTICS_AND_INTERPRETATION
+Theme: Diagnostic Modalities & Data Interpretation
+Includes: Questions concerning the literal acquisition and translation of diagnostic data, definitions, imaging indications, imaging interpretation, and laboratory interpretation.
+
+* Tag: PRESENTATION_AND_DELIVERY
+Theme: Clinical Presentation & Care Delivery
+Includes: Questions about point-of-care presentation, emergency care management, clinical applications, and patient education.
+
+* Tag: DRUG_SAFETY
+Theme: Pharmacodynamics & Drug Safety
+Includes: Questions regarding drug classification, drug compatibility, drug interactions, and overall pharmacological safety profiles.
+
+* Tag: THERAPEUTICS_AND_TOXICITY
+Theme: Therapeutic Management & Toxicity
+Includes: Questions regarding active prescribing decisions, such as empiric therapy, emerging therapies, dosing parameters, contraindications, and specific side effects or toxicities.
+
+Question:
+{note_text}
+
+Output format example:
+{{
+    "primary_question_type": "treatment",
+    "secondary_question_types": ["drug selection"],
+}}

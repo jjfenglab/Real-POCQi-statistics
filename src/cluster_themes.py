@@ -23,7 +23,6 @@ from hdbscan import HDBSCAN
 # Categories to cluster (from QuestionTypeExtraction model)
 THEME_CATEGORIES = [
     "question_types",
-    "question_format"
 ]
 
 

@@ -13,8 +13,8 @@ output_dir="${data_dir}/output"
 
 run mkdir -p "${output_dir}"
 
-run python3 extract_answer_lengths.py "${data_dir}"
-run Rscript blind_vendors.R "${data_dir}" "${mapping_path}"
+# run python3 extract_answer_lengths.py "${data_dir}"
+# run Rscript blind_vendors.R "${data_dir}" "${mapping_path}"
 
 echo "## Knitting descriptives.Rmd..."
 echo "   -> Outputs: descriptives.html, .RData"
