@@ -13,8 +13,8 @@ output_dir="${data_dir}/output"
 
 run mkdir -p "${output_dir}"
 
-# run python3 extract_answer_lengths.py "${data_dir}"
-# run Rscript blind_vendors.R "${data_dir}" "${mapping_path}"
+run python3 extract_answer_lengths.py "${data_dir}"
+run Rscript blind_vendors.R "${data_dir}" "${mapping_path}"
 
 echo "## Knitting descriptives.Rmd..."
 echo "   -> Outputs: descriptives.html, .RData"
@@ -39,3 +39,7 @@ run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_d
 # # Example code for running analysis where you drop only a single vendor from the analysis
 # echo "## Knitting analysis.Rmd (bootstrap by question, drop vendor A)..."
 # run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', drop_vendor='A', output_name='analysis_by_question_drop_A'), output_file='analysis_by_question_drop_A.html', output_dir='${output_dir}')"
+
+echo "## Knitting exploratory_analysis.Rmd..."
+echo "   -> Outputs: exploratory_analysis.html, .RData"
+run Rscript -e "rmarkdown::render('exploratory_analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='exploratory_analysis'), output_file='exploratory_analysis.html', output_dir='${output_dir}')"
