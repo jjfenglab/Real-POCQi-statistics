@@ -12,7 +12,7 @@ params:
   output_dir: null
   output_name: "judge_analysis"
   bootstrap_by: "question"
-  n_boot: 10000
+  n_boot: 0
   n_boot_corr: 1000
 ---
 
@@ -143,7 +143,7 @@ prepare_one_vs_rest_df <- function(df, vendor) {
     select(question_id, outcome)
 }
 
-run_favorability_analysis_simple <- function(df, axis_name, n_boot = 10000,
+run_favorability_analysis_simple <- function(df, axis_name, n_boot = 0,
                                              seed = 42, bootstrap_by = "question") {
   set.seed(seed)
   axis_df <- df %>% filter(axis == axis_name)
@@ -159,7 +159,7 @@ run_favorability_analysis_simple <- function(df, axis_name, n_boot = 10000,
 
     if (n_boot > 0) {
       test_df$user_id <- seq_len(nrow(test_df))
-      test_result <- run_favorability_test(test_df, n_boot = n_boot, ci_level = 0.95,
+      test_result <- run_favorability_test(test_df, n_boot = n_boot, ci_level = NULL,
                                            bootstrap_by = bootstrap_by)
       ci_lower <- test_result$ci_lower
       ci_upper <- test_result$ci_upper
@@ -277,13 +277,15 @@ all_favorability %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
-# Compute Spearman correlation: judge vs human
+# Compute Kendall's tau correlation: judge vs human
 
-For each judge (and jury), compute the Spearman rank correlation between the
-judge's favorability scores and the human expert's scores, per axis.
+For each judge (and jury), compute Kendall's tau correlation between the
+judge's favorability scores and the human expert's scores. We use Kendall's tau
+since we only have 4 vendors to rank. We compute per-axis correlations and then
+average across axes, bootstrapping to get meaningful CIs.
 
-```{r spearman_correlation}
-compute_spearman_vs_human <- function(fav_df) {
+```{r kendall_correlation}
+compute_kendall_vs_human <- function(fav_df) {
   human_df <- fav_df %>% filter(judge == "human") %>% select(axis, vendor, human_fav = favorability)
 
   fav_df %>%
@@ -291,34 +293,45 @@ compute_spearman_vs_human <- function(fav_df) {
     left_join(human_df, by = c("axis", "vendor")) %>%
     group_by(judge, axis) %>%
     summarise(
-      spearman = cor(favorability, human_fav, method = "spearman"),
+      kendall = cor(favorability, human_fav, method = "kendall"),
       n_vendors = n(),
       .groups = "drop"
     )
 }
 
-spearman_results <- compute_spearman_vs_human(all_favorability)
+compute_avg_kendall_vs_human <- function(fav_df) {
+  per_axis <- compute_kendall_vs_human(fav_df)
+  per_axis %>%
+    group_by(judge) %>%
+    summarise(
+      avg_kendall = mean(kendall, na.rm = TRUE),
+      n_axes = sum(!is.na(kendall)),
+      .groups = "drop"
+    )
+}
 
-spearman_results %>%
-  pivot_wider(names_from = axis, values_from = spearman, names_prefix = "rho_") %>%
-  kable(caption = "Spearman correlation of judge favorability vs human expert",
+kendall_per_axis <- compute_kendall_vs_human(all_favorability)
+kendall_avg <- compute_avg_kendall_vs_human(all_favorability)
+
+kendall_per_axis %>%
+  pivot_wider(names_from = axis, values_from = kendall, names_prefix = "tau_") %>%
+  kable(caption = "Per-axis Kendall's tau of judge favorability vs human expert (n=4 vendors each)",
         digits = 3) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
-# Bootstrap confidence intervals for Spearman correlation
+# Bootstrap confidence intervals for average Kendall's tau
 
-Bootstrap by question to compute 95% CI for the Spearman correlations.
+Bootstrap by question to compute 95% CI for the average Kendall's tau
+across all axes.
 
-```{r bootstrap_spearman}
-bootstrap_spearman <- function(human_df, machine_df, jury_df, axes,
-                               n_boot = 1000, seed = 42,
-                               bootstrap_by = "question") {
+```{r bootstrap_kendall}
+bootstrap_avg_kendall <- function(human_df, machine_df, axes,
+                                   n_boot = 1000, seed = 42,
+                                   bootstrap_by = "question") {
   set.seed(seed)
 
   graders <- unique(machine_df$grader)
-  judges <- c(graders, "jury")
-
   question_ids <- unique(c(human_df$question_id, machine_df$question_id))
 
   boot_results <- vector("list", n_boot)
@@ -326,8 +339,21 @@ bootstrap_spearman <- function(human_df, machine_df, jury_df, axes,
   for (b in seq_len(n_boot)) {
     boot_questions <- sample(question_ids, length(question_ids), replace = TRUE)
 
-    human_boot <- human_df %>% filter(question_id %in% boot_questions)
-    machine_boot <- machine_df %>% filter(question_id %in% boot_questions)
+    # Create bootstrap instances with unique IDs to prevent downstream collapse
+    boot_instances <- tibble(question_id = boot_questions) %>%
+      group_by(question_id) %>%
+      mutate(boot_instance = row_number()) %>%
+      ungroup()
+
+    # Join and assign unique question_id per bootstrap instance
+    human_boot <- human_df %>%
+      inner_join(boot_instances, by = "question_id", relationship = "many-to-many") %>%
+      mutate(question_id = paste0(question_id, "_", boot_instance)) %>%
+      select(-boot_instance)
+    machine_boot <- machine_df %>%
+      inner_join(boot_instances, by = "question_id", relationship = "many-to-many") %>%
+      mutate(question_id = paste0(question_id, "_", boot_instance)) %>%
+      select(-boot_instance)
 
     jury_boot <- machine_boot %>%
       mutate(score = choice_to_score[choice]) %>%
@@ -363,57 +389,68 @@ bootstrap_spearman <- function(human_df, machine_df, jury_df, axes,
 
     if (nrow(boot_fav) == 0) next
 
-    boot_spearman <- compute_spearman_vs_human(boot_fav)
-    boot_spearman$boot_iter <- b
-    boot_results[[b]] <- boot_spearman
+    boot_avg_kendall <- compute_avg_kendall_vs_human(boot_fav)
+    boot_avg_kendall$boot_iter <- b
+    boot_results[[b]] <- boot_avg_kendall
   }
 
   bind_rows(boot_results)
 }
 
-boot_spearman_df <- bootstrap_spearman(
-  human_text_only, machine_text_only, jury_ratings, axes,
+boot_kendall_df <- bootstrap_avg_kendall(
+  human_text_only, machine_text_only, axes,
   n_boot = params$n_boot_corr, seed = 42, bootstrap_by = params$bootstrap_by
 )
 ```
 
-```{r spearman_ci}
-spearman_ci <- boot_spearman_df %>%
-  group_by(judge, axis) %>%
+```{r kendall_ci}
+# Pivotal bootstrap CI: [2*theta_hat - q_upper, 2*theta_hat - q_lower]
+kendall_ci <- boot_kendall_df %>%
+  group_by(judge) %>%
   summarise(
-    ci_lower = quantile(spearman, 0.025, na.rm = TRUE),
-    ci_upper = quantile(spearman, 0.975, na.rm = TRUE),
+    q_lower = quantile(avg_kendall, 0.025, na.rm = TRUE),
+    q_upper = quantile(avg_kendall, 0.975, na.rm = TRUE),
     .groups = "drop"
   )
 
-spearman_final <- spearman_results %>%
-  left_join(spearman_ci, by = c("judge", "axis")) %>%
+kendall_final <- kendall_avg %>%
+  left_join(kendall_ci, by = "judge") %>%
   mutate(
-    spearman_fmt = sprintf("%.3f [%.3f, %.3f]", spearman, ci_lower, ci_upper)
-  )
+    ci_lower = 2 * avg_kendall - q_upper,
+    ci_upper = 2 * avg_kendall - q_lower,
+    kendall_fmt = sprintf("%.3f [%.3f, %.3f]", avg_kendall, ci_lower, ci_upper)
+  ) %>%
+  arrange(desc(avg_kendall))
 
-spearman_final %>%
-  select(judge, axis, spearman_fmt) %>%
-  pivot_wider(names_from = axis, values_from = spearman_fmt) %>%
-  kable(caption = "Spearman correlation vs human expert with 95% bootstrap CI") %>%
+kendall_final %>%
+  select(judge, kendall_fmt) %>%
+  kable(caption = "Average Kendall's tau vs human expert (across 5 axes) with 95% pivotal bootstrap CI",
+        col.names = c("Judge", "Average Kendall's tau [95% CI]")) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
-# Summary statistics
+# Bootstrap correlation histograms
 
-```{r summary_stats}
-avg_spearman_by_judge <- spearman_final %>%
-  group_by(judge) %>%
-  summarise(
-    mean_spearman = mean(spearman, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  arrange(desc(mean_spearman))
+Visualize the distribution of bootstrap correlations for each judge to diagnose
+the bootstrap confidence intervals.
 
-avg_spearman_by_judge %>%
-  kable(caption = "Average Spearman correlation across axes",
-        digits = 3) %>%
-  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```{r bootstrap_histograms, fig.width=10, fig.height=8}
+boot_kendall_df %>%
+  left_join(kendall_final %>% select(judge, point_est = avg_kendall, ci_lower, ci_upper), by = "judge") %>%
+  ggplot(aes(x = avg_kendall)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
+  geom_vline(aes(xintercept = point_est), color = "red", linetype = "dashed", linewidth = 1) +
+  geom_vline(aes(xintercept = ci_lower), color = "darkgreen", linetype = "dotted", linewidth = 0.8) +
+  geom_vline(aes(xintercept = ci_upper), color = "darkgreen", linetype = "dotted", linewidth = 0.8) +
+  facet_wrap(~ judge, scales = "free_y", ncol = 2) +
+  labs(
+    title = "Bootstrap distribution of average Kendall's tau (judge vs human)",
+    subtitle = "Red dashed = point estimate; Green dotted = 95% pivotal CI bounds",
+    x = "Average Kendall's tau",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(strip.text = element_text(face = "bold", size = 11))
 ```
 
 
@@ -427,6 +464,7 @@ save.image(file = rdata_path)
 message("Saved RData to: ", rdata_path)
 
 write_csv(all_favorability, file.path(output_dir, "judge_favorability.csv"))
-write_csv(spearman_final, file.path(output_dir, "judge_spearman_correlation.csv"))
+write_csv(kendall_per_axis, file.path(output_dir, "judge_kendall_per_axis.csv"))
+write_csv(kendall_final, file.path(output_dir, "judge_kendall_avg.csv"))
 message("Saved CSV outputs to: ", output_dir)
 ```
