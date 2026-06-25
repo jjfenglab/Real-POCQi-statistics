@@ -13,7 +13,7 @@ params:
   output_name: "judge_analysis"
   bootstrap_by: "question"
   n_boot: 0
-  n_boot_corr: 1000
+  n_boot_corr: 0
 ---
 
 ```{r setup, include=FALSE}
@@ -320,151 +320,14 @@ kendall_per_axis %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
-# Bootstrap confidence intervals for average Kendall's tau
+# Average Kendall's tau across axes
 
-Bootstrap by question to compute 95% CI for the average Kendall's tau
-across all axes.
-
-```{r bootstrap_kendall}
-bootstrap_avg_kendall <- function(human_df, machine_df, axes,
-                                   n_boot = 1000, seed = 42,
-                                   bootstrap_by = "question") {
-  set.seed(seed)
-
-  graders <- unique(machine_df$grader)
-  question_ids <- unique(c(human_df$question_id, machine_df$question_id))
-
-  boot_results <- vector("list", n_boot)
-
-  for (b in seq_len(n_boot)) {
-    boot_questions <- sample(question_ids, length(question_ids), replace = TRUE)
-
-    # Create bootstrap instances with unique IDs to prevent downstream collapse
-    boot_instances <- tibble(question_id = boot_questions) %>%
-      group_by(question_id) %>%
-      mutate(boot_instance = row_number()) %>%
-      ungroup()
-
-    # Join and assign unique question_id per bootstrap instance
-    human_boot <- human_df %>%
-      inner_join(boot_instances, by = "question_id", relationship = "many-to-many") %>%
-      mutate(question_id = paste0(question_id, "_", boot_instance)) %>%
-      select(-boot_instance)
-    machine_boot <- machine_df %>%
-      inner_join(boot_instances, by = "question_id", relationship = "many-to-many") %>%
-      mutate(question_id = paste0(question_id, "_", boot_instance)) %>%
-      select(-boot_instance)
-
-    jury_boot <- machine_boot %>%
-      mutate(score = choice_to_score[choice]) %>%
-      group_by(question_id, slot_a_vendor, slot_b_vendor, axis) %>%
-      summarise(avg_score = mean(score, na.rm = TRUE), .groups = "drop") %>%
-      mutate(
-        winner = case_when(avg_score < -0.5 ~ slot_a_vendor, avg_score > 0.5 ~ slot_b_vendor, TRUE ~ NA_character_),
-        loser = case_when(avg_score < -0.5 ~ slot_b_vendor, avg_score > 0.5 ~ slot_a_vendor, TRUE ~ NA_character_),
-        is_tie = abs(avg_score) <= 0.5
-      )
-
-    boot_fav <- map_dfr(axes, function(ax) {
-      human_fav <- run_favorability_analysis_simple(human_boot, ax, n_boot = 0, bootstrap_by = bootstrap_by)
-      if (is.null(human_fav) || nrow(human_fav) == 0) return(NULL)
-      human_fav <- human_fav %>% mutate(axis = ax, judge = "human")
-
-      judge_fav <- map_dfr(graders, function(g) {
-        judge_df <- machine_boot %>% filter(grader == g)
-        res <- run_favorability_analysis_simple(judge_df, ax, n_boot = 0, bootstrap_by = bootstrap_by)
-        if (is.null(res) || nrow(res) == 0) return(NULL)
-        res %>% mutate(axis = ax, judge = g)
-      })
-
-      jury_fav <- run_favorability_analysis_simple(jury_boot, ax, n_boot = 0, bootstrap_by = bootstrap_by)
-      if (!is.null(jury_fav) && nrow(jury_fav) > 0) {
-        jury_fav <- jury_fav %>% mutate(axis = ax, judge = "jury")
-      } else {
-        jury_fav <- NULL
-      }
-
-      bind_rows(human_fav, judge_fav, jury_fav)
-    })
-
-    if (nrow(boot_fav) == 0) next
-
-    boot_avg_kendall <- compute_avg_kendall_vs_human(boot_fav)
-    boot_avg_kendall$boot_iter <- b
-    boot_results[[b]] <- boot_avg_kendall
-  }
-
-  bind_rows(boot_results)
-}
-
-boot_kendall_df <- bootstrap_avg_kendall(
-  human_text_only, machine_text_only, axes,
-  n_boot = params$n_boot_corr, seed = 42, bootstrap_by = params$bootstrap_by
-)
-```
-
-```{r kendall_ci}
-# Pivotal bootstrap CI: [2*theta_hat - q_upper, 2*theta_hat - q_lower]
-kendall_ci <- boot_kendall_df %>%
-  group_by(judge) %>%
-  summarise(
-    q_lower = quantile(avg_kendall, 0.025, na.rm = TRUE),
-    q_upper = quantile(avg_kendall, 0.975, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-kendall_final <- kendall_avg %>%
-  left_join(kendall_ci, by = "judge") %>%
-  mutate(
-    ci_lower = 2 * avg_kendall - q_upper,
-    ci_upper = 2 * avg_kendall - q_lower,
-    kendall_fmt = sprintf("%.3f [%.3f, %.3f]", avg_kendall, ci_lower, ci_upper)
-  ) %>%
-  arrange(desc(avg_kendall))
-
-kendall_final %>%
-  select(judge, kendall_fmt) %>%
-  kable(caption = "Average Kendall's tau vs human expert (across 5 axes) with 95% pivotal bootstrap CI",
-        col.names = c("Judge", "Average Kendall's tau [95% CI]")) %>%
+```{r kendall_summary}
+kendall_avg %>%
+  arrange(desc(avg_kendall)) %>%
+  kable(caption = "Average Kendall's tau across all axes by judge",
+        digits = 3,
+        col.names = c("Judge", "Avg Kendall's tau", "N axes")) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 ```
 
-# Bootstrap correlation histograms
-
-Visualize the distribution of bootstrap correlations for each judge to diagnose
-the bootstrap confidence intervals.
-
-```{r bootstrap_histograms, fig.width=10, fig.height=8}
-boot_kendall_df %>%
-  left_join(kendall_final %>% select(judge, point_est = avg_kendall, ci_lower, ci_upper), by = "judge") %>%
-  ggplot(aes(x = avg_kendall)) +
-  geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
-  geom_vline(aes(xintercept = point_est), color = "red", linetype = "dashed", linewidth = 1) +
-  geom_vline(aes(xintercept = ci_lower), color = "darkgreen", linetype = "dotted", linewidth = 0.8) +
-  geom_vline(aes(xintercept = ci_upper), color = "darkgreen", linetype = "dotted", linewidth = 0.8) +
-  facet_wrap(~ judge, scales = "free_y", ncol = 2) +
-  labs(
-    title = "Bootstrap distribution of average Kendall's tau (judge vs human)",
-    subtitle = "Red dashed = point estimate; Green dotted = 95% pivotal CI bounds",
-    x = "Average Kendall's tau",
-    y = "Count"
-  ) +
-  theme_minimal() +
-  theme(strip.text = element_text(face = "bold", size = 11))
-```
-
-
-# Save outputs
-
-```{r save_outputs}
-output_dir <- ifelse(is.null(params$output_dir), params$data_dir, params$output_dir)
-
-rdata_path <- file.path(output_dir, paste0(params$output_name, ".RData"))
-save.image(file = rdata_path)
-message("Saved RData to: ", rdata_path)
-
-write_csv(all_favorability, file.path(output_dir, "judge_favorability.csv"))
-write_csv(kendall_per_axis, file.path(output_dir, "judge_kendall_per_axis.csv"))
-write_csv(kendall_final, file.path(output_dir, "judge_kendall_avg.csv"))
-message("Saved CSV outputs to: ", output_dir)
-```
