@@ -232,7 +232,7 @@ format_favorability_table(favorability_verifiability, "verifiability")
 
 ## Summary: Outcome distribution by vendor and axis
 
-```{r outcome_distribution_plot, fig.width=10, fig.height=6}
+```{r outcome_distribution_helpers}
 compute_outcome_distribution <- function(df, axis_name,
                                          subversion_filter = "qa_text_only",
                                          use_weights = params$equal_weight) {
@@ -277,31 +277,6 @@ compute_outcome_distribution <- function(df, axis_name,
 
 axes <- c("accuracy", "clinical_utility", "authoritativeness", "verifiability", "completeness")
 
-outcome_data <- map_dfr(axes, function(ax) {
-  compute_outcome_distribution(qa_ratings, ax)
-})
-
-outcome_data <- outcome_data %>%
-  mutate(
-    outcome = factor(outcome,
-                     levels = c("Strong Loss", "Slight Loss", "Tie",
-                                "Slight Win", "Strong Win"))
-  )
-
-vendor_order <- outcome_data %>%
-  filter(outcome %in% c("Slight Win", "Strong Win")) %>%
-  group_by(vendor) %>%
-  summarise(avg_win_pct = mean(pct), .groups = "drop") %>%
-  arrange(desc(avg_win_pct)) %>%
-  pull(vendor)
-
-# Create display name order matching vendor_order
-vendor_order_display <- vendor_display_names[vendor_order]
-
-outcome_data <- outcome_data %>%
-  mutate(vendor_display = vendor_display_names[vendor]) %>%
-  mutate(vendor_display = factor(vendor_display, levels = vendor_order_display))
-
 axis_labels <- c(
   "accuracy" = "Accuracy",
   "clinical_utility" = "Clinical Utility",
@@ -310,10 +285,79 @@ axis_labels <- c(
   "completeness" = "Completeness"
 )
 
-outcome_data <- outcome_data %>%
-  mutate(axis = factor(axis_labels[axis],
-                       levels = c("Accuracy", "Clinical Utility", "Source Quality",
-                                  "Verifiability", "Completeness")))
+plot_outcome_distribution <- function(outcome_data, sig_data, vendor_order_display) {
+  outcome_data <- outcome_data %>%
+    mutate(
+      outcome = factor(outcome,
+                       levels = c("Strong Loss", "Slight Loss", "Tie",
+                                  "Slight Win", "Strong Win")),
+      vendor_display = vendor_display_names[vendor],
+      vendor_display = factor(vendor_display, levels = vendor_order_display),
+      axis = factor(axis_labels[axis],
+                    levels = c("Accuracy", "Clinical Utility", "Source Quality",
+                               "Verifiability", "Completeness"))
+    )
+
+  sig_data <- sig_data %>%
+    filter(p_value < 0.05) %>%
+    mutate(
+      vendor_display = vendor_display_names[vendor],
+      vendor_display = factor(vendor_display, levels = vendor_order_display),
+      axis = factor(axis, levels = c("Accuracy", "Clinical Utility", "Source Quality",
+                                     "Verifiability", "Completeness"))
+    )
+
+  ggplot(outcome_data, aes(x = vendor_display, y = pct, fill = outcome)) +
+    geom_bar(stat = "identity", position = "stack") +
+    geom_text(
+      data = sig_data,
+      aes(x = vendor_display, y = 101, label = "*"),
+      inherit.aes = FALSE,
+      size = 6, vjust = 0.5
+    ) +
+    facet_wrap(~ axis, nrow = 1, strip.position = "bottom") +
+    scale_fill_manual(
+      values = c("Strong Loss" = "#d73027",
+                 "Slight Loss" = "#fc8d59",
+                 "Tie" = "#fee090",
+                 "Slight Win" = "#91bfdb",
+                 "Strong Win" = "#4575b4"),
+      name = "Outcome"
+    ) +
+    labs(
+      x = "",
+      y = "Outcome Distribution"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 0, hjust = 0.5, margin = margin(t = -5)),
+      strip.text.x = element_text(size = 10),
+      strip.placement = "outside",
+      legend.position = "bottom",
+      legend.margin = margin(t = -10),
+      panel.grid = element_blank(),
+      plot.margin = margin(t = 0, r = 5, b = 5, l = 5)
+    ) +
+    coord_cartesian(ylim = c(0, 100), clip = "off")
+}
+
+get_vendor_order <- function(outcome_data) {
+  outcome_data %>%
+    filter(outcome %in% c("Slight Win", "Strong Win")) %>%
+    group_by(vendor) %>%
+    summarise(avg_win_pct = mean(pct), .groups = "drop") %>%
+    arrange(desc(avg_win_pct)) %>%
+    pull(vendor)
+}
+```
+
+```{r outcome_distribution_plot, fig.width=10, fig.height=6}
+outcome_data <- map_dfr(axes, function(ax) {
+  compute_outcome_distribution(qa_ratings, ax)
+})
+
+vendor_order <- get_vendor_order(outcome_data)
+vendor_order_display <- vendor_display_names[vendor_order]
 
 sig_data <- bind_rows(
   favorability_accuracy %>% mutate(axis = "Accuracy"),
@@ -321,48 +365,9 @@ sig_data <- bind_rows(
   favorability_authoritativeness %>% mutate(axis = "Source Quality"),
   favorability_verifiability %>% mutate(axis = "Verifiability"),
   favorability_completeness %>% mutate(axis = "Completeness")
-) %>%
-  filter(p_value < 0.05) %>%
-  mutate(
-    vendor_display = vendor_display_names[vendor],
-    vendor_display = factor(vendor_display, levels = vendor_order_display),
-    axis = factor(axis, levels = c("Accuracy", "Clinical Utility", "Source Quality",
-                                   "Verifiability", "Completeness"))
-  )
+)
 
-p_outcome <- ggplot(outcome_data, aes(x = vendor_display, y = pct, fill = outcome)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(
-    data = sig_data,
-    aes(x = vendor_display, y = 101, label = "*"),
-    inherit.aes = FALSE,
-    size = 6, vjust = 0.5
-  ) +
-  facet_wrap(~ axis, nrow = 1, strip.position = "bottom") +
-  scale_fill_manual(
-    values = c("Strong Loss" = "#d73027",
-               "Slight Loss" = "#fc8d59",
-               "Tie" = "#fee090",
-               "Slight Win" = "#91bfdb",
-               "Strong Win" = "#4575b4"),
-    name = "Outcome"
-  ) +
-  labs(
-    x = "",
-    y = "Outcome Distribution"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 0, hjust = 0.5, margin = margin(t = -5)),
-    strip.text.x = element_text(size = 10),
-    strip.placement = "outside",
-    legend.position = "bottom",
-    legend.margin = margin(t = -10),
-    panel.grid = element_blank(),
-    plot.margin = margin(t = 0, r = 5, b = 5, l = 5)
-  ) +
-  coord_cartesian(ylim = c(0, 100), clip = "off")
-
+p_outcome <- plot_outcome_distribution(outcome_data, sig_data, vendor_order_display)
 p_outcome
 
 ggsave(file.path(params$output_dir, "fig_outcome_distribution.pdf"),
@@ -584,6 +589,105 @@ plot_winrate_heatmap(qa_ratings_included, "verifiability")
 plot_winrate_heatmap(qa_ratings_included, "completeness")
 ```
 
+## Combined win-rate matrix panel
+
+```{r winrate_panel_setup}
+library(cowplot)
+
+create_winrate_panel <- function(df, axis_name, panel_label, show_y_axis = TRUE) {
+  plot_data <- build_win_matrix_for_plot(df %>% filter(axis == axis_name))
+
+  plot_data <- plot_data %>%
+    mutate(
+      row_display = vendor_display_names[row_vendor],
+      col_display = vendor_display_names[col_vendor],
+      label_rate = sprintf("%.0f", 100 * win_rate),
+      row_display = factor(row_display, levels = vendor_order_display),
+      col_display = factor(col_display, levels = vendor_order_display)
+    )
+
+  display_name <- axis_display_names[axis_name]
+
+  p <- ggplot(plot_data, aes(x = col_display, y = row_display, fill = win_rate)) +
+    geom_tile(color = "white", linewidth = 0.5) +
+    geom_text(aes(label = label_rate), size = 3.5) +
+    scale_fill_gradient(
+      low = "#f7fbff", high = "#2171b5",
+      limits = c(0, 1),
+      labels = scales::percent,
+      name = "Win Rate (%)"
+    ) +
+    scale_x_discrete(position = "bottom", drop = FALSE) +
+    scale_y_discrete(limits = rev(vendor_order_display), drop = FALSE) +
+    labs(
+      title = display_name,
+      x = "... vs. this system",
+      y = if (show_y_axis) "Win rate of this system..." else NULL,
+      tag = panel_label
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      axis.text.x = element_text(angle = 0, hjust = 0.5),
+      axis.text.y = if (show_y_axis) element_text() else element_blank(),
+      axis.title.y = if (show_y_axis) element_text(size = 10) else element_blank(),
+      axis.title.x = element_text(size = 10),
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 12),
+      plot.tag = element_text(face = "bold", size = 14),
+      plot.tag.position = c(0, 1),
+      legend.position = "none",
+      panel.grid = element_blank()
+    ) +
+    coord_fixed()
+
+  return(p)
+}
+
+create_winrate_legend <- function() {
+  dummy_data <- tibble(x = 1, y = 1, fill = 0.5)
+
+  p_legend <- ggplot(dummy_data, aes(x = x, y = y, fill = fill)) +
+    geom_tile() +
+    scale_fill_gradient(
+      low = "#f7fbff", high = "#2171b5",
+      limits = c(0, 1),
+      labels = scales::percent,
+      name = "Win Rate",
+      breaks = c(0, 0.25, 0.5, 0.75, 1)
+    ) +
+    theme_void() +
+    theme(
+      legend.position = "right",
+      legend.key.height = unit(1.2, "cm"),
+      legend.key.width = unit(0.4, "cm"),
+      legend.title = element_text(size = 10),
+      legend.text = element_text(size = 9)
+    ) +
+    guides(fill = guide_colorbar(title.position = "top"))
+
+  legend <- cowplot::get_legend(p_legend)
+  return(legend)
+}
+```
+
+```{r winrate_panel_plot, fig.width=12, fig.height=8}
+p_wr_accuracy <- create_winrate_panel(qa_ratings_included, "accuracy", "a", show_y_axis = TRUE)
+p_wr_clinical <- create_winrate_panel(qa_ratings_included, "clinical_utility", "b", show_y_axis = FALSE)
+p_wr_source <- create_winrate_panel(qa_ratings_included, "authoritativeness", "c", show_y_axis = FALSE)
+p_wr_verif <- create_winrate_panel(qa_ratings_included, "verifiability", "d", show_y_axis = TRUE)
+p_wr_complete <- create_winrate_panel(qa_ratings_included, "completeness", "e", show_y_axis = FALSE)
+wr_legend <- create_winrate_legend()
+
+top_row_wr <- plot_grid(p_wr_accuracy, p_wr_clinical, p_wr_source, nrow = 1, rel_widths = c(1.3, 1, 1))
+bottom_row_wr <- plot_grid(p_wr_verif, p_wr_complete, wr_legend, nrow = 1, rel_widths = c(1.3, 1, 1))
+
+p_winrate_panel <- plot_grid(top_row_wr, bottom_row_wr, nrow = 2)
+
+print(p_winrate_panel)
+
+ggsave(file.path(params$output_dir, "fig_winrate_panel.pdf"),
+       p_winrate_panel, width = 12, height = 8)
+```
+
 # Secondary Analysis: Win difference score for `qa_text_citations`
 
 Same one-vs-rest win difference (favorability score) test as the primary analysis, but
@@ -633,6 +737,32 @@ favorability_citations_verifiability <- run_favorability_analysis(
   qa_ratings, "verifiability", subversion_filter = "qa_text_citations")
 format_favorability_table(favorability_citations_verifiability, "verifiability",
                           rendering = "qa_text_citations")
+```
+
+## Summary: Outcome distribution by vendor and axis (text+citations)
+
+```{r outcome_distribution_citations_plot, fig.width=10, fig.height=6}
+outcome_data_citations <- map_dfr(axes, function(ax) {
+  compute_outcome_distribution(qa_ratings, ax, subversion_filter = "qa_text_citations")
+})
+
+vendor_order_citations <- get_vendor_order(outcome_data_citations)
+vendor_order_citations_display <- vendor_display_names[vendor_order_citations]
+
+sig_data_citations <- bind_rows(
+  favorability_citations_accuracy %>% mutate(axis = "Accuracy"),
+  favorability_citations_clinical %>% mutate(axis = "Clinical Utility"),
+  favorability_citations_authoritativeness %>% mutate(axis = "Source Quality"),
+  favorability_citations_verifiability %>% mutate(axis = "Verifiability"),
+  favorability_citations_completeness %>% mutate(axis = "Completeness")
+)
+
+p_outcome_citations <- plot_outcome_distribution(outcome_data_citations, sig_data_citations,
+                                                  vendor_order_citations_display)
+p_outcome_citations
+
+ggsave(file.path(params$output_dir, "fig_outcome_distribution_citations.pdf"),
+       p_outcome_citations, width = 10, height = 6)
 ```
 
 # Sensitivity analysis: Strict win-rate tables
@@ -690,6 +820,101 @@ for (ax in axes) {
                     bootstrap_options = c("striped", "hover"))
   )
 }
+```
+
+# Sensitivity analysis: Strict win difference tests
+
+Same one-vs-rest win difference (favorability score) test as the primary
+analysis, but using the strict win definition: only `strongly_a`/`strongly_b`
+counts as a win. Comparisons restricted to `qa_text_only`.
+
+```{r strict_favorability_helpers}
+run_strict_favorability_analysis <- function(df, axis_name,
+                                             subversion_filter = "qa_text_only",
+                                             n_boot = 10000, seed = 42,
+                                             bootstrap_by = params$bootstrap_by,
+                                             use_weights = params$equal_weight) {
+  set.seed(seed)
+
+  axis_df <- df %>%
+    filter(subversion == subversion_filter, axis == axis_name) %>%
+    apply_strict_win_definition()
+
+  vendors <- sort(unique(c(axis_df$slot_a_vendor, axis_df$slot_b_vendor)))
+
+  map_dfr(vendors, function(v) {
+    test_df <- prepare_one_vs_rest_df(axis_df, v, use_weights = use_weights)
+
+    weights <- if (use_weights) test_df$weight else NULL
+    fav_score <- get_favorability_score(test_df$outcome, weights)
+    test_result <- run_favorability_test(test_df, n_boot = n_boot, ci_level = 0.95,
+                                         bootstrap_by = bootstrap_by)
+
+    tibble(
+      vendor = v,
+      wins = sum(test_df$outcome == 1),
+      ties = sum(test_df$outcome == 0),
+      losses = sum(test_df$outcome == -1),
+      n = nrow(test_df),
+      favorability = fav_score,
+      ci_lower = test_result$ci_lower,
+      ci_upper = test_result$ci_upper,
+      p_value = test_result$p_value
+    )
+  })
+}
+
+format_strict_favorability_table <- function(results, axis_name,
+                                             rendering = "text-only") {
+  results %>%
+    mutate(
+      favorability = sprintf("%.1f%%", 100 * favorability),
+      ci_95 = sprintf("[%.1f%%, %.1f%%]", 100 * ci_lower, 100 * ci_upper),
+      p_value = sprintf("%.4f", p_value)
+    ) %>%
+    select(vendor, wins, ties, losses, n, favorability, ci_95, p_value) %>%
+    kable(caption = sprintf(
+      "Strict one-vs-rest favorability test (%s, %s axis) — only strongly_* counts as win",
+      rendering, axis_name
+    )) %>%
+    kable_styling(full_width = FALSE,
+                  bootstrap_options = c("striped", "hover"))
+}
+```
+
+## Clinical utility (strict)
+
+```{r strict_favorability_clinical}
+strict_favorability_clinical <- run_strict_favorability_analysis(qa_ratings, "clinical_utility")
+format_strict_favorability_table(strict_favorability_clinical, "clinical utility")
+```
+
+## Accuracy (strict)
+
+```{r strict_favorability_accuracy}
+strict_favorability_accuracy <- run_strict_favorability_analysis(qa_ratings, "accuracy")
+format_strict_favorability_table(strict_favorability_accuracy, "accuracy")
+```
+
+## Authoritativeness (strict)
+
+```{r strict_favorability_authoritativeness}
+strict_favorability_authoritativeness <- run_strict_favorability_analysis(qa_ratings, "authoritativeness")
+format_strict_favorability_table(strict_favorability_authoritativeness, "authoritativeness")
+```
+
+## Completeness (strict)
+
+```{r strict_favorability_completeness}
+strict_favorability_completeness <- run_strict_favorability_analysis(qa_ratings, "completeness")
+format_strict_favorability_table(strict_favorability_completeness, "completeness")
+```
+
+## Verifiability (strict)
+
+```{r strict_favorability_verifiability}
+strict_favorability_verifiability <- run_strict_favorability_analysis(qa_ratings, "verifiability")
+format_strict_favorability_table(strict_favorability_verifiability, "verifiability")
 ```
 
 # Sensitivity analysis: Length-stratified favorability tests
@@ -881,6 +1106,53 @@ length_stratified_all <- bind_rows(
   )
 ```
 
+```{r stratified_all_axes_plot_helper}
+plot_stratified_all_axes <- function(data, fill_colors, legend_name) {
+  plot_data <- data %>%
+    mutate(
+      vendor_display = vendor_display_names[as.character(vendor)],
+      vendor_display = factor(vendor_display, levels = vendor_order_display),
+      axis = factor(axis, levels = c("Accuracy", "Clinical Utility", "Source Quality",
+                                     "Verifiability", "Completeness"))
+    )
+
+  ggplot(plot_data, aes(x = vendor_display, y = 100 * favorability, fill = stratum)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+    geom_errorbar(
+      aes(ymin = 100 * ci_lower, ymax = 100 * ci_upper),
+      position = position_dodge(width = 0.8),
+      width = 0.25
+    ) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    facet_wrap(~ axis, nrow = 1, strip.position = "bottom") +
+    scale_fill_manual(values = fill_colors, name = legend_name) +
+    labs(x = "", y = "Win Difference (%)") +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 0, hjust = 0.5, margin = margin(t = -5)),
+      strip.text.x = element_text(size = 10),
+      strip.placement = "outside",
+      legend.position = "bottom",
+      legend.margin = margin(t = -10),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor = element_blank(),
+      plot.margin = margin(t = 0, r = 5, b = 5, l = 5)
+    )
+}
+```
+
+```{r length_stratified_all_axes_plot, fig.width=10, fig.height=6}
+p_length_all <- plot_stratified_all_axes(
+  length_stratified_all,
+  fill_colors = c("Longer" = "#7b3294", "Shorter" = "#c2a5cf"),
+  legend_name = "Answer Length"
+)
+p_length_all
+
+ggsave(file.path(params$output_dir, "fig_length_stratified_all_axes.pdf"),
+       p_length_all, width = 10, height = 6)
+```
+
 Plots are combined with OE status stratification below.
 
 # Sensitivity analysis: OE status-stratified favorability tests
@@ -1045,6 +1317,32 @@ oe_status_stratified_completeness <- run_oe_status_stratified_analysis(
 format_oe_status_stratified_table(oe_status_stratified_completeness, "Completeness")
 ```
 
+## Summary: OE status-stratified favorability scores
+
+```{r oe_status_stratified_all_axes_plot, fig.width=10, fig.height=6}
+oe_status_stratified_all <- bind_rows(
+  oe_status_stratified_accuracy %>% mutate(axis = "Accuracy"),
+  oe_status_stratified_clinical %>% mutate(axis = "Clinical Utility"),
+  oe_status_stratified_authoritativeness %>% mutate(axis = "Source Quality"),
+  oe_status_stratified_verifiability %>% mutate(axis = "Verifiability"),
+  oe_status_stratified_completeness %>% mutate(axis = "Completeness")
+) %>%
+  mutate(
+    vendor = factor(vendor, levels = vendor_order),
+    stratum = factor(stratum, levels = c("On OE", "Off OE"))
+  )
+
+p_oe_all <- plot_stratified_all_axes(
+  oe_status_stratified_all,
+  fill_colors = c("On OE" = "#d95f02", "Off OE" = "#fee0b6"),
+  legend_name = "OE Status"
+)
+p_oe_all
+
+ggsave(file.path(params$output_dir, "fig_oe_status_stratified_all_axes.pdf"),
+       p_oe_all, width = 10, height = 6)
+```
+
 ## Summary: Sensitivity analysis plots (exported individually)
 
 ```{r sensitivity_plot_helpers}
@@ -1169,6 +1467,8 @@ fit_davidson <- function(df, use_weights = params$equal_weight) {
 
   if (use_weights) {
     df <- compute_pair_weights(df)
+    # Rescale weights so they sum to n (preserves effective sample size)
+    df$weight <- df$weight * nrow(df) / sum(df$weight)
   } else {
     df$weight <- 1
   }
@@ -1270,6 +1570,89 @@ for (ax in axes) {
     sprintf("Davidson rankings on axis = %s", ax)
   ))
 }
+```
+
+## Davidson worth by model (normalized to reference)
+
+```{r davidson_worth_plot, fig.width=10, fig.height=6}
+# Combine Davidson fits into a single data frame
+davidson_plot_data <- map_dfr(names(davidson_fits_per_axis), function(ax) {
+
+  dav <- davidson_fits_per_axis[[ax]]
+  tibble(
+    axis = ax,
+    vendor = dav$vendors,
+    worth = dav$worth,
+    worth_lower = dav$worth_lower,
+    worth_upper = dav$worth_upper
+  )
+})
+
+# Find the reference vendor (highest average worth = OE when unblinded)
+ref_vendor <- davidson_plot_data %>%
+  group_by(vendor) %>%
+  summarise(avg_worth = mean(worth), .groups = "drop") %>%
+  arrange(desc(avg_worth)) %>%
+  slice(1) %>%
+  pull(vendor)
+
+# Normalize worth values relative to reference vendor within each axis
+davidson_plot_data <- davidson_plot_data %>%
+  group_by(axis) %>%
+  mutate(
+    ref_worth = worth[vendor == ref_vendor],
+    worth_norm = worth / ref_worth,
+    worth_lower_norm = worth_lower / ref_worth,
+    worth_upper_norm = worth_upper / ref_worth
+  ) %>%
+  ungroup()
+
+# Apply display names and factor ordering
+davidson_plot_data <- davidson_plot_data %>%
+  mutate(
+    vendor_display = vendor_display_names[vendor],
+    vendor_display = factor(vendor_display, levels = vendor_order_display),
+    axis = factor(axis_labels[axis],
+                  levels = c("Accuracy", "Clinical Utility", "Source Quality",
+                             "Verifiability", "Completeness"))
+  )
+
+# Create the plot
+p_davidson_worth <- ggplot(davidson_plot_data,
+                           aes(x = axis, y = worth_norm, fill = vendor_display)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(
+    aes(ymin = worth_lower_norm, ymax = worth_upper_norm),
+    position = position_dodge(width = 0.8),
+    width = 0.25
+  ) +
+  geom_text(
+    aes(label = sprintf("%.2f", worth_norm), y = worth_upper_norm + 0.03),
+    position = position_dodge(width = 0.8),
+    size = 3, vjust = 0
+  ) +
+  geom_hline(yintercept = 1.0, linetype = "dashed", color = "gray50") +
+  scale_fill_manual(
+    values = c("OE" = "#DDDDDD", "Claude" = "#8C84BA", "Gemini" = "#5A80A4", "GPT" = "#548C7F"),
+    name = ""
+  ) +
+  scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    x = "",
+    y = sprintf("Worth ratio α̃ (relative to %s)", vendor_display_names[ref_vendor])
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    legend.position = "top",
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+p_davidson_worth
+
+ggsave(file.path(params$output_dir, "fig_davidson_worth_by_model.pdf"),
+       p_davidson_worth, width = 10, height = 6)
 ```
 
 # Save everything
