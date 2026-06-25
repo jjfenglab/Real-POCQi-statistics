@@ -422,7 +422,7 @@ plot_outcome_distribution_two_panel <- function(outcome_data, favorability_data,
                  "Slight Loss" = "#fc8d59",
                  "Strong Loss" = "#d73027"),
       breaks = c("Strong Loss", "Slight Loss", "Tie", "Slight Win", "Strong Win"),
-      labels = c("Much worse", "Somewhat worse", "About equal", "Somewhat better", "Much better"),
+      labels = c("Much\nworse", "Somewhat\nworse", "About\nequal", "Somewhat\nbetter", "Much\nbetter"),
       name = ""
     ) +
     labs(
@@ -436,8 +436,8 @@ plot_outcome_distribution_two_panel <- function(outcome_data, favorability_data,
       strip.text.x = element_text(size = 10),
       strip.placement = "outside",
       legend.position = "bottom",
-      legend.justification = "right",
-      legend.margin = margin(t = -25, r = 10),
+      legend.justification = "center",
+      legend.margin = margin(t = -25, r = 0),
       legend.key.width = unit(0.4, "cm"), 
       legend.key.height = unit(0.4, "cm"),
       legend.text = element_text(size = 9),
@@ -801,23 +801,19 @@ create_winrate_legend <- function() {
 }
 ```
 
-```{r winrate_panel_plot, fig.width=12, fig.height=8}
+```{r winrate_panel_plot, fig.width=6, fig.height=20}
 p_wr_accuracy <- create_winrate_panel(qa_ratings_included, "accuracy", "a", show_y_axis = TRUE)
-p_wr_clinical <- create_winrate_panel(qa_ratings_included, "clinical_utility", "b", show_y_axis = FALSE)
-p_wr_source <- create_winrate_panel(qa_ratings_included, "authoritativeness", "c", show_y_axis = FALSE)
+p_wr_clinical <- create_winrate_panel(qa_ratings_included, "clinical_utility", "b", show_y_axis = TRUE)
+p_wr_source <- create_winrate_panel(qa_ratings_included, "authoritativeness", "c", show_y_axis = TRUE)
 p_wr_verif <- create_winrate_panel(qa_ratings_included, "verifiability", "d", show_y_axis = TRUE)
-p_wr_complete <- create_winrate_panel(qa_ratings_included, "completeness", "e", show_y_axis = FALSE)
-wr_legend <- create_winrate_legend()
+p_wr_complete <- create_winrate_panel(qa_ratings_included, "completeness", "e", show_y_axis = TRUE)
 
-top_row_wr <- plot_grid(p_wr_accuracy, p_wr_clinical, p_wr_source, nrow = 1, rel_widths = c(1.3, 1, 1))
-bottom_row_wr <- plot_grid(p_wr_verif, p_wr_complete, wr_legend, nrow = 1, rel_widths = c(1.3, 1, 1))
-
-p_winrate_panel <- plot_grid(top_row_wr, bottom_row_wr, nrow = 2)
+p_winrate_panel <- plot_grid(p_wr_accuracy, p_wr_clinical, p_wr_source, p_wr_verif, p_wr_complete, ncol = 1)
 
 print(p_winrate_panel)
 
 ggsave(file.path(params$output_dir, "fig_winrate_panel.pdf"),
-       p_winrate_panel, width = 12, height = 8)
+       p_winrate_panel, width = 6, height = 20)
 ```
 
 # Secondary Analysis: Win difference score for `qa_text_citations`
@@ -893,8 +889,23 @@ p_outcome_citations <- plot_outcome_distribution(outcome_data_citations, sig_dat
                                                   vendor_order_citations_display)
 p_outcome_citations
 
+favorability_data_citations <- bind_rows(
+  favorability_citations_accuracy %>% mutate(axis = "Accuracy"),
+  favorability_citations_clinical %>% mutate(axis = "Clinical Utility"),
+  favorability_citations_authoritativeness %>% mutate(axis = "Source Quality"),
+  favorability_citations_verifiability %>% mutate(axis = "Verifiability"),
+  favorability_citations_completeness %>% mutate(axis = "Completeness")
+)
+
+p_outcome_citations_two_panel <- plot_outcome_distribution_two_panel(outcome_data_citations,
+                                                                      favorability_data_citations,
+                                                                      vendor_order_citations_display)
+p_outcome_citations_two_panel
+
 ggsave(file.path(params$output_dir, "fig_outcome_distribution_citations.pdf"),
        p_outcome_citations, width = 10, height = 6)
+ggsave(file.path(params$output_dir, "fig_outcome_distribution_citations_two_panel.pdf"),
+       p_outcome_citations_two_panel, width = 8, height = 6)
 ```
 
 # Sensitivity analysis: Strict win-rate tables
@@ -952,6 +963,22 @@ for (ax in axes) {
                     bootstrap_options = c("striped", "hover"))
   )
 }
+```
+
+```{r strict_winrate_panel_plot, fig.width=6, fig.height=20}
+p_wr_strict_accuracy <- create_winrate_panel(qa_ratings_strict, "accuracy", "a", show_y_axis = TRUE)
+p_wr_strict_clinical <- create_winrate_panel(qa_ratings_strict, "clinical_utility", "b", show_y_axis = TRUE)
+p_wr_strict_source <- create_winrate_panel(qa_ratings_strict, "authoritativeness", "c", show_y_axis = TRUE)
+p_wr_strict_verif <- create_winrate_panel(qa_ratings_strict, "verifiability", "d", show_y_axis = TRUE)
+p_wr_strict_complete <- create_winrate_panel(qa_ratings_strict, "completeness", "e", show_y_axis = TRUE)
+
+p_winrate_panel_strict <- plot_grid(p_wr_strict_accuracy, p_wr_strict_clinical, p_wr_strict_source,
+                                     p_wr_strict_verif, p_wr_strict_complete, ncol = 1)
+
+print(p_winrate_panel_strict)
+
+ggsave(file.path(params$output_dir, "fig_winrate_panel_strict.pdf"),
+       p_winrate_panel_strict, width = 6, height = 20)
 ```
 
 # Sensitivity analysis: Strict win difference tests
