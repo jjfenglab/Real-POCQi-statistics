@@ -969,6 +969,24 @@ for (ax in axes) {
 }
 ```
 
+```{r strict_winrate_panel_plot, fig.width=12, fig.height=8}
+p_wr_strict_accuracy <- create_winrate_panel(qa_ratings_strict, "accuracy", "a", show_y_axis = TRUE)
+p_wr_strict_clinical <- create_winrate_panel(qa_ratings_strict, "clinical_utility", "b", show_y_axis = FALSE)
+p_wr_strict_source <- create_winrate_panel(qa_ratings_strict, "authoritativeness", "c", show_y_axis = FALSE)
+p_wr_strict_verif <- create_winrate_panel(qa_ratings_strict, "verifiability", "d", show_y_axis = TRUE)
+p_wr_strict_complete <- create_winrate_panel(qa_ratings_strict, "completeness", "e", show_y_axis = FALSE)
+
+top_row_wr_strict <- plot_grid(p_wr_strict_accuracy, p_wr_strict_clinical, p_wr_strict_source, nrow = 1, rel_widths = c(1.3, 1, 1))
+bottom_row_wr_strict <- plot_grid(p_wr_strict_verif, p_wr_strict_complete, wr_legend, nrow = 1, rel_widths = c(1.3, 1, 1))
+
+p_winrate_panel_strict <- plot_grid(top_row_wr_strict, bottom_row_wr_strict, nrow = 2)
+
+print(p_winrate_panel_strict)
+
+ggsave(file.path(params$output_dir, "fig_winrate_panel_strict.pdf"),
+       p_winrate_panel_strict, width = 12, height = 8)
+```
+
 # Sensitivity analysis: Strict win difference tests
 
 Same one-vs-rest win difference (favorability score) test as the primary
