@@ -14,6 +14,7 @@ params:
   bootstrap_by: "question"
   n_boot: 0
   n_boot_corr: 0
+  unblind: false
 ---
 
 ```{r setup, include=FALSE}
@@ -35,6 +36,7 @@ cat(sprintf("- **Output directory:** `%s`\n", ifelse(is.null(params$output_dir),
 cat(sprintf("- **Bootstrap by:** %s\n", params$bootstrap_by))
 cat(sprintf("- **N bootstrap (favorability):** %d\n", params$n_boot))
 cat(sprintf("- **N bootstrap (correlation CI):** %d\n", params$n_boot_corr))
+cat(sprintf("- **Unblind vendors:** %s\n", ifelse(params$unblind, "yes", "no")))
 ```
 
 # Load human ratings data
@@ -63,6 +65,22 @@ qa_ratings_human <- apply_inclusion_criteria(qa_ratings_human)
 ```{r load_mapping}
 secret_mapping <- read_csv(file.path(data_dir, "secret_mapping.csv"))
 provider_to_vendor <- setNames(secret_mapping$vendor, secret_mapping$provider)
+
+# Vendor display names: blinded (A/B/C/D) by default, unblinded if params$unblind
+vendor_display_names <- c("A" = "A", "B" = "B", "C" = "C", "D" = "D")
+if (params$unblind) {
+  for (i in seq_len(nrow(secret_mapping))) {
+    code <- secret_mapping$vendor[i]
+    name <- secret_mapping$provider[i]
+    vendor_display_names[code] <- case_when(
+      grepl("openevidence", name, ignore.case = TRUE) ~ "OE",
+      grepl("gpt", name, ignore.case = TRUE) ~ "GPT",
+      grepl("claude|opus", name, ignore.case = TRUE) ~ "Claude",
+      grepl("gemini", name, ignore.case = TRUE) ~ "Gemini",
+      TRUE ~ name
+    )
+  }
+}
 ```
 
 # Load and process machine ratings
@@ -329,5 +347,183 @@ kendall_avg %>%
         digits = 3,
         col.names = c("Judge", "Avg Kendall's tau", "N axes")) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+# Grader-Gradee Win Difference Heatmaps
+
+Create heatmaps showing win difference (favorability) scores where rows are graders
+(judges) and columns are gradees (vendors being rated).
+
+```{r heatmap_setup}
+library(cowplot)
+
+# Define display labels
+axis_labels <- c(
+  accuracy = "Accuracy",
+  clinical_utility = "Clinical utility",
+  authoritativeness = "Source quality",
+  completeness = "Completeness",
+  verifiability = "Verifiability"
+)
+
+# Define grader display names (provider -> display name)
+grader_display_names <- c()
+for (i in seq_len(nrow(secret_mapping))) {
+  provider <- secret_mapping$provider[i]
+  if (params$unblind) {
+    grader_display_names[provider] <- case_when(
+      grepl("gpt", provider, ignore.case = TRUE) ~ "GPT",
+      grepl("claude|opus", provider, ignore.case = TRUE) ~ "Claude",
+      grepl("gemini", provider, ignore.case = TRUE) ~ "Gemini",
+      TRUE ~ provider
+    )
+  } else {
+    grader_display_names[provider] <- secret_mapping$vendor[i]
+  }
+}
+
+# Fixed ordering: GPT, Gemini, Claude, Human specialist for graders (Y-axis)
+grader_display_order <- c("GPT", "Gemini", "Claude", "Expert")
+# Fixed ordering: GPT, Gemini, Claude, OE for gradees (X-axis)
+gradee_display_order <- c("GPT", "Gemini", "Claude", "OE")
+
+# Map graders (providers) to their vendor code (for diagonal highlighting)
+grader_to_vendor <- setNames(
+  provider_to_vendor[unique(machine_text_only$grader)],
+  unique(machine_text_only$grader)
+)
+grader_to_vendor["human"] <- NA
+```
+
+```{r heatmap_data}
+# Reshape favorability data into grader-gradee matrix format
+heatmap_data <- all_favorability %>%
+  mutate(
+    grader = judge,
+    gradee = vendor,
+    win_diff_pct = 100 * favorability,
+    # Get vendor code for grader (for diagonal check)
+    grader_vendor_code = case_when(
+      grader == "human" ~ NA_character_,
+      grader == "jury" ~ NA_character_,
+      TRUE ~ grader_to_vendor[grader]
+    ),
+    is_diagonal = !is.na(grader_vendor_code) & grader_vendor_code == gradee
+  ) %>%
+  select(grader, gradee, axis, win_diff_pct, is_diagonal)
+
+# Create display labels for graders and gradees
+heatmap_data <- heatmap_data %>%
+  mutate(
+    grader_label = case_when(
+      grader == "human" ~ "Expert",
+      grader == "jury" ~ "Jury",
+      TRUE ~ grader_display_names[grader]
+    ),
+    gradee_label = vendor_display_names[gradee],
+    grader_label = factor(grader_label, levels = grader_display_order),
+    gradee_label = factor(gradee_label, levels = gradee_display_order)
+  ) %>%
+  filter(!is.na(grader_label))
+```
+
+```{r heatmap_function}
+create_axis_heatmap <- function(data, axis_name, panel_label, show_y_axis = TRUE) {
+  plot_data <- data %>% filter(axis == axis_name)
+
+  # Identify diagonal cells for border highlighting
+  diagonal_data <- plot_data %>% filter(is_diagonal)
+
+  p <- ggplot(plot_data, aes(x = gradee_label, y = grader_label, fill = win_diff_pct)) +
+    geom_tile(color = "white", linewidth = 0.5) +
+    geom_text(aes(label = round(win_diff_pct)), size = 3.5) +
+    # Add black border for diagonal cells (self-preference)
+    geom_tile(data = diagonal_data, color = "black", linewidth = 1.2, fill = NA) +
+    scale_fill_gradient2(
+      low = "#B2182B", mid = "#F7F7F7", high = "#2166AC",
+      midpoint = 0, limits = c(-100, 100),
+      name = "Win difference (%)"
+    ) +
+    scale_x_discrete(position = "bottom", drop = FALSE) +
+    scale_y_discrete(limits = rev(grader_display_order), drop = FALSE) +
+    labs(
+      title = axis_labels[axis_name],
+      x = "Gradee (system being rated)",
+      y = if (show_y_axis) "Grader (rater)" else NULL,
+      tag = panel_label
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      axis.text.x = element_text(angle = 0, hjust = 0.5),
+      axis.text.y = if (show_y_axis) element_text() else element_blank(),
+      axis.title.y = if (show_y_axis) element_text(size = 10) else element_blank(),
+      axis.title.x = element_text(size = 10),
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 12),
+      plot.tag = element_text(face = "bold", size = 14),
+      plot.tag.position = c(0, 1),
+      legend.position = "none",
+      panel.grid = element_blank()
+    )
+
+  return(p)
+}
+
+# Create legend-only plot
+create_legend_plot <- function() {
+  # Dummy data for legend
+  dummy_data <- tibble(x = 1, y = 1, fill = 0)
+
+  p_legend <- ggplot(dummy_data, aes(x = x, y = y, fill = fill)) +
+    geom_tile() +
+    scale_fill_gradient2(
+      low = "#B2182B", mid = "#F7F7F7", high = "#2166AC",
+      midpoint = 0, limits = c(-100, 100),
+      name = "Win difference (%)",
+      breaks = c(-100, -50, 0, 50, 100)
+    ) +
+    theme_void() +
+    theme(
+      legend.position = "right",
+      legend.key.height = unit(1.2, "cm"),
+      legend.key.width = unit(0.4, "cm"),
+      legend.title = element_text(size = 10),
+      legend.text = element_text(size = 9)
+    ) +
+    guides(fill = guide_colorbar(title.position = "top"))
+
+  legend <- cowplot::get_legend(p_legend)
+  return(legend)
+}
+```
+
+```{r heatmap_grid, fig.width=12, fig.height=8}
+# Create individual heatmaps
+p_accuracy <- create_axis_heatmap(heatmap_data, "accuracy", "a", show_y_axis = TRUE)
+p_clinical <- create_axis_heatmap(heatmap_data, "clinical_utility", "b", show_y_axis = FALSE)
+p_source <- create_axis_heatmap(heatmap_data, "authoritativeness", "c", show_y_axis = FALSE)
+p_verif <- create_axis_heatmap(heatmap_data, "verifiability", "d", show_y_axis = TRUE)
+p_complete <- create_axis_heatmap(heatmap_data, "completeness", "e", show_y_axis = FALSE)
+legend <- create_legend_plot()
+
+# Arrange in 2x3 grid
+top_row <- plot_grid(p_accuracy, p_clinical, p_source, nrow = 1, rel_widths = c(1.3, 1, 1))
+bottom_row <- plot_grid(p_verif, p_complete, legend, nrow = 1, rel_widths = c(1.3, 1, 1),
+                        align = "h")
+
+final_plot <- plot_grid(top_row, bottom_row, nrow = 2)
+
+print(final_plot)
+```
+
+```{r save_heatmap}
+output_dir <- ifelse(is.null(params$output_dir), params$data_dir, params$output_dir)
+ggsave(
+  file.path(output_dir, paste0(params$output_name, "_grader_gradee_heatmap.pdf")),
+  final_plot, width = 12, height = 8
+)
+ggsave(
+  file.path(output_dir, paste0(params$output_name, "_grader_gradee_heatmap.png")),
+  final_plot, width = 12, height = 8, dpi = 300
+)
 ```
 

@@ -35,11 +35,18 @@ answer_lengths  <- read_csv(file.path(data_dir, "answer_lengths.csv"),
 vendors <- sort(unique(c(assignments$slot_a_provider,
                          assignments$slot_b_provider)))
 
-if (length(vendors) > length(LETTERS)) {
-  stop("More vendors than available single-letter labels.")
+if (file.exists(mapping_path)) {
+  message(sprintf("Mapping file %s already exists; reusing existing mapping.",
+                  mapping_path))
+  existing_mapping <- read_csv(mapping_path, show_col_types = FALSE)
+  vendor_mapping <- setNames(existing_mapping$vendor,
+                              existing_mapping$provider)
+} else {
+  if (length(vendors) > length(LETTERS)) {
+    stop("More vendors than available single-letter labels.")
+  }
+  vendor_mapping <- setNames(sample(LETTERS[seq_along(vendors)]), vendors)
 }
-
-vendor_mapping <- setNames(sample(LETTERS[seq_along(vendors)]), vendors)
 
 assignments_blinded <- assignments %>%
   mutate(

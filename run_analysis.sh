@@ -44,6 +44,15 @@ echo "## Knitting exploratory_analysis.Rmd..."
 echo "   -> Outputs: exploratory_analysis.html, .RData"
 run Rscript -e "rmarkdown::render('exploratory_analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='exploratory_analysis'), output_file='exploratory_analysis.html', output_dir='${output_dir}')"
 
+## UNBLINDED ANALYSES
+
 echo "## Knitting judge_analysis.Rmd..."
 echo "   -> Outputs: judge_analysis.html, .RData"
-run Rscript -e "rmarkdown::render('judge_analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='judge_analysis'), output_file='judge_analysis.html', output_dir='${output_dir}')"
+run Rscript -e "rmarkdown::render('judge_analysis.Rmd', params=list(unblind='true', data_dir='${data_dir}', output_dir='${output_dir}', output_name='judge_analysis'), output_file='judge_analysis.html', output_dir='${output_dir}')"
+
+echo "## Knitting analysis.Rmd (UNBLINDED)..."
+echo "   -> Outputs: analysis_by_question_equal.html, .RData"
+run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(unblind='true', equal_weight='true', data_dir='${data_dir}', output_dir='${output_dir}', output_name='analysis_by_question_equal'), output_file='analysis_by_question_equal.html', output_dir='${output_dir}')"
+
+# Code for making figure 2
+python assemble_figure2.py data_6-21-3-56-00pm-nohb/output
