@@ -68,7 +68,7 @@ assignments_in_queue <- assignments %>%
   { if (!is.null(prior_users)) filter(., !user_id %in% prior_users$id) else . } %>%
   count(user_id, name = "n_assigned")
 
-summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
+summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue, user_registrations) {
   n_axes <- n_distinct(qa_ratings_subset$axis)
 
   mean_ratings_per_axis <- nrow(qa_ratings_subset) / n_axes
@@ -156,6 +156,14 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
       completion_rate = n_completed / n_assigned
     )
 
+  graders_with_state <- qa_ratings_subset %>%
+    distinct(user_id) %>%
+    inner_join(users %>% select(id, email), by = c("user_id" = "id")) %>%
+    left_join(user_registrations %>% select(Email, State),
+              by = c("email" = "Email")) %>%
+    filter(!is.na(State))
+  n_unique_states <- n_distinct(graders_with_state$State)
+
   completion_rate_stats <- per_user_rate %>%
     summarise(
       mean_r = mean(completion_rate),
@@ -178,6 +186,7 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue) {
             ratings_per_question_stats$max_n),
     n_distinct(qa_ratings_subset$specialty),
     n_distinct(qa_ratings_subset$user_id),
+    n_unique_states,
     subversion_summary,
     sprintf("%.1f ± %.1f",
             avg_completed_per_user$mean_n,
@@ -213,6 +222,7 @@ table1 <- tibble(
     "Num ratings per question (median [min, max])",
     "Specialties with ≥1 rating",
     "Graders who submitted ≥1 rating",
+    "Unique US states covered by graders",
     "Graders with ≥1 rating per rendering mode",
     "Completed assignments per grader (mean ± SD)",
     "Completed assignments per grader (median [min, max])",
@@ -220,8 +230,8 @@ table1 <- tibble(
     "Submission time, seconds (mean ± SD)",
     "Submission time, seconds (median [min, max])"
   ),
-  `All ratings` = summarise_cohort(qa_ratings, users, assignments_in_queue),
-  `Submission time ≥ 10s` = summarise_cohort(qa_ratings_passing, users, assignments_in_queue)
+  `All ratings` = summarise_cohort(qa_ratings, users, assignments_in_queue, user_registrations),
+  `Submission time ≥ 10s` = summarise_cohort(qa_ratings_passing, users, assignments_in_queue, user_registrations)
 )
 
 table1_caption <- paste(

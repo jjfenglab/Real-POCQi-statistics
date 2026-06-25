@@ -601,7 +601,8 @@ create_winrate_panel <- function(df, axis_name, panel_label, show_y_axis = TRUE)
     mutate(
       row_display = vendor_display_names[row_vendor],
       col_display = vendor_display_names[col_vendor],
-      label_rate = sprintf("%.0f", 100 * win_rate),
+      label_rate = sprintf("%.1f%%", 100 * win_rate),
+      label_ci = sprintf("[%.1f, %.1f]", 100 * ci_lower, 100 * ci_upper),
       row_display = factor(row_display, levels = vendor_order_display),
       col_display = factor(col_display, levels = vendor_order_display)
     )
@@ -610,7 +611,10 @@ create_winrate_panel <- function(df, axis_name, panel_label, show_y_axis = TRUE)
 
   p <- ggplot(plot_data, aes(x = col_display, y = row_display, fill = win_rate)) +
     geom_tile(color = "white", linewidth = 0.5) +
-    geom_text(aes(label = label_rate), size = 3.5) +
+    geom_text(aes(label = label_rate, fontface = "bold"), size = 4, color = "black",
+              nudge_y = 0.12) +
+    geom_text(aes(label = label_ci), size = 2.5, color = "black",
+              nudge_y = -0.15) +
     scale_fill_gradient(
       low = "#f7fbff", high = "#2171b5",
       limits = c(0, 1),
@@ -1633,13 +1637,13 @@ p_davidson_worth <- ggplot(davidson_plot_data,
   ) +
   geom_hline(yintercept = 1.0, linetype = "dashed", color = "gray50") +
   scale_fill_manual(
-    values = c("OE" = "#DDDDDD", "Claude" = "#8C84BA", "Gemini" = "#5A80A4", "GPT" = "#548C7F"),
+    values = c("OE" = "#CC8E50", "Claude" = "#8C84BA", "Gemini" = "#5A80A4", "GPT" = "#548C7F"),
     name = ""
   ) +
   scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) +
   labs(
     x = "",
-    y = sprintf("Worth ratio α̃ (relative to %s)", vendor_display_names[ref_vendor])
+    y = sprintf("Worth ratio")
   ) +
   theme_minimal() +
   theme(
