@@ -24,6 +24,10 @@ echo "## Knitting analysis.Rmd (bootstrap by question)..."
 echo "   -> Outputs: analysis_by_question.html, .RData"
 run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='analysis_by_question'), output_file='analysis_by_question.html', output_dir='${output_dir}')"
 
+echo "## Knitting analysis.Rmd (bootstrap by question)..."
+echo "   -> Outputs: analysis_by_question_equal.html, .RData"
+run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(unblind='true', equal_weight='true', data_dir='${data_dir}', output_dir='${output_dir}', output_name='analysis_by_question_equal'), output_file='analysis_by_question_equal.html', output_dir='${output_dir}')"
+
 echo "## Knitting analysis.Rmd (bootstrap by user)..."
 echo "   -> Outputs: analysis_by_user.html, .RData"
 run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='analysis_by_user'), output_file='analysis_by_user.html', output_dir='${output_dir}')"
