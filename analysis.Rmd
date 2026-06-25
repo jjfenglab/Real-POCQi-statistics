@@ -422,7 +422,7 @@ plot_outcome_distribution_two_panel <- function(outcome_data, favorability_data,
                  "Slight Loss" = "#fc8d59",
                  "Strong Loss" = "#d73027"),
       breaks = c("Strong Loss", "Slight Loss", "Tie", "Slight Win", "Strong Win"),
-      labels = c("Much worse", "Somewhat worse", "About equal", "Somewhat better", "Much better"),
+      labels = c("Much\nworse", "Somewhat\nworse", "About\nequal", "Somewhat\nbetter", "Much\nbetter"),
       name = ""
     ) +
     labs(
@@ -436,8 +436,8 @@ plot_outcome_distribution_two_panel <- function(outcome_data, favorability_data,
       strip.text.x = element_text(size = 10),
       strip.placement = "outside",
       legend.position = "bottom",
-      legend.justification = "right",
-      legend.margin = margin(t = -25, r = 10),
+      legend.justification = "center",
+      legend.margin = margin(t = -25, r = 0),
       legend.key.width = unit(0.4, "cm"), 
       legend.key.height = unit(0.4, "cm"),
       legend.text = element_text(size = 9),
@@ -893,8 +893,23 @@ p_outcome_citations <- plot_outcome_distribution(outcome_data_citations, sig_dat
                                                   vendor_order_citations_display)
 p_outcome_citations
 
+favorability_data_citations <- bind_rows(
+  favorability_citations_accuracy %>% mutate(axis = "Accuracy"),
+  favorability_citations_clinical %>% mutate(axis = "Clinical Utility"),
+  favorability_citations_authoritativeness %>% mutate(axis = "Source Quality"),
+  favorability_citations_verifiability %>% mutate(axis = "Verifiability"),
+  favorability_citations_completeness %>% mutate(axis = "Completeness")
+)
+
+p_outcome_citations_two_panel <- plot_outcome_distribution_two_panel(outcome_data_citations,
+                                                                      favorability_data_citations,
+                                                                      vendor_order_citations_display)
+p_outcome_citations_two_panel
+
 ggsave(file.path(params$output_dir, "fig_outcome_distribution_citations.pdf"),
        p_outcome_citations, width = 10, height = 6)
+ggsave(file.path(params$output_dir, "fig_outcome_distribution_citations_two_panel.pdf"),
+       p_outcome_citations_two_panel, width = 8, height = 6)
 ```
 
 # Sensitivity analysis: Strict win-rate tables
