@@ -61,7 +61,7 @@ def assemble_figure(output_dir: str, output_name: str = "fig_combined.pdf"):
             raise FileNotFoundError(f"Missing required file: {output_path / f}")
 
     dpi = 300
-    img_outcome = pdf_to_image(output_path / "fig_outcome_distribution.pdf", dpi)
+    img_outcome = pdf_to_image(output_path / "fig_outcome_distribution_two_panel.pdf", dpi)
     img_heatmap = pdf_to_image(output_path / "fig_winrate_heatmap_accuracy.pdf", dpi)
     img_length = pdf_to_image(output_path / "fig_sensitivity_length_accuracy.pdf", dpi)
     img_oe = pdf_to_image(output_path / "fig_sensitivity_oe_accuracy.pdf", dpi)
@@ -102,8 +102,9 @@ def assemble_figure(output_dir: str, output_name: str = "fig_combined.pdf"):
 
     label_offset = 15
     draw.text((label_offset, label_offset), "A", fill="black", font=font)
-    draw.text((label_offset, img_outcome_resized.height + gap + label_offset), "B", fill="black", font=font)
-    draw.text((img_heatmap_resized.width + gap + label_offset, img_outcome_resized.height + gap + label_offset), "C", fill="black", font=font)
+    draw.text((label_offset + img_outcome_resized.width * 0.4, label_offset), "B", fill="black", font=font)
+    draw.text((label_offset, img_outcome_resized.height + gap + label_offset), "C", fill="black", font=font)
+    draw.text((img_heatmap_resized.width + gap + label_offset, img_outcome_resized.height + gap + label_offset), "D", fill="black", font=font)
 
     out_file = output_path / output_name
     final_img.save(out_file, dpi=(300, 300))

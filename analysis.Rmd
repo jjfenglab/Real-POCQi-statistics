@@ -341,6 +341,118 @@ plot_outcome_distribution <- function(outcome_data, sig_data, vendor_order_displ
     coord_cartesian(ylim = c(0, 100), clip = "off")
 }
 
+plot_outcome_distribution_two_panel <- function(outcome_data, favorability_data, vendor_order_display) {
+  library(cowplot)
+
+  # Prepare outcome data for right panel (horizontal bars)
+  outcome_data <- outcome_data %>%
+    mutate(
+      outcome = factor(outcome,
+                       levels = c("Strong Win", "Slight Win", "Tie",
+                                  "Slight Loss", "Strong Loss")),
+      vendor_display = vendor_display_names[vendor],
+      vendor_display = factor(vendor_display, levels = vendor_order_display),
+      axis = factor(axis_labels[axis],
+                    levels = c("Accuracy", "Clinical Utility", "Source Quality",
+                               "Verifiability", "Completeness")),
+      pct = pct / 100
+    )
+
+  # Prepare favorability data for left panel (dot plot)
+  favorability_data <- favorability_data %>%
+    mutate(
+      vendor_display = vendor_display_names[vendor],
+      vendor_display = factor(vendor_display, levels = vendor_order_display),
+      axis = factor(axis, levels = c("Accuracy", "Clinical Utility", "Source Quality",
+                                     "Verifiability", "Completeness"))
+    )
+
+  sig_data <- sig_data %>%
+    filter(p_value < 0.05) %>%
+    mutate(
+      vendor_display = vendor_display_names[vendor],
+      vendor_display = factor(vendor_display, levels = vendor_order_display),
+      axis = factor(axis, levels = c("Accuracy", "Clinical Utility", "Source Quality",
+                                     "Verifiability", "Completeness"))
+    )
+
+  # Create left panel: Win-loss rate dot plot with confidence intervals
+  p_left <- ggplot(favorability_data, aes(x = favorability, y = vendor_display)) +
+    geom_vline(xintercept = 0, linetype = "solid", color = "black", linewidth = 0.5) +
+    geom_errorbarh(aes(xmin = ci_lower, xmax = ci_upper),
+                   height = 0.2, color = "gray50", alpha = 0.8) +
+    geom_point(size = 2, color = "#000000") +
+    geom_text(
+      data = sig_data,
+      aes(y = vendor_display, x = 0.55, label = "*"),
+      inherit.aes = FALSE,
+      size = 6, vjust = 0.8
+    ) +
+    facet_wrap(~ axis, ncol = 1, strip.position = "bottom") +
+    scale_x_continuous(
+      labels = scales::percent_format(accuracy = 1), 
+      limits = c(-0.59, 0.59),
+      breaks = seq(-0.5, 0.5, by = 0.25)
+    ) +
+    labs(
+      title = "Win Difference One vs. Rest",
+      x = "",
+      y = ""
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 11),
+      strip.text.x = element_text(size = 10),
+      strip.placement = "outside",
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.text.y = element_text(size = 9),
+      plot.margin = margin(t = 3, r = 4, b = 0, l = 5)
+    ) +
+    coord_cartesian(clip = "off")
+
+  # Create right panel: Horizontal stacked bars (transposed version)
+  p_right <- ggplot(outcome_data, aes(y = vendor_display, x = pct, fill = outcome, order = outcome)) +
+    geom_bar(stat = "identity", position = "stack") +
+    facet_wrap(~ axis, ncol = 1, strip.position = "bottom") +
+    scale_fill_manual(
+      values = c("Strong Win" = "#4575b4",
+                 "Slight Win" = "#91bfdb",
+                 "Tie" = "#fee090",
+                 "Slight Loss" = "#fc8d59",
+                 "Strong Loss" = "#d73027"),
+      breaks = c("Strong Loss", "Slight Loss", "Tie", "Slight Win", "Strong Win"),
+      labels = c("Much worse", "Somewhat worse", "About equal", "Somewhat better", "Much better"),
+      name = ""
+    ) +
+    labs(
+      title = "Preference Ratings One vs. Rest",
+      x = "",
+      y = ""
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 11),
+      strip.text.x = element_text(size = 10),
+      strip.placement = "outside",
+      legend.position = "bottom",
+      legend.justification = "right",
+      legend.margin = margin(t = -25, r = 10),
+      legend.key.width = unit(0.4, "cm"), 
+      legend.key.height = unit(0.4, "cm"),
+      legend.text = element_text(size = 9),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.text.y = element_text(margin = margin(r = 2)),
+      plot.margin = margin(t = 3, r = 0, b = 0, l = 0)
+    ) +
+    scale_x_continuous(labels = scales::percent) +
+    coord_cartesian(xlim = c(0, 1), clip = "off")
+
+  # Combine panels
+  plot_grid(p_left, p_right, ncol = 2, rel_widths = c(0.6, 1), align = "h", axis = "tb")
+}
+
 get_vendor_order <- function(outcome_data) {
   outcome_data %>%
     filter(outcome %in% c("Slight Win", "Strong Win")) %>%
@@ -351,7 +463,7 @@ get_vendor_order <- function(outcome_data) {
 }
 ```
 
-```{r outcome_distribution_plot, fig.width=10, fig.height=6}
+```{r outcome_distribution_plot, fig.width=14, fig.height=6}
 outcome_data <- map_dfr(axes, function(ax) {
   compute_outcome_distribution(qa_ratings, ax)
 })
@@ -367,11 +479,27 @@ sig_data <- bind_rows(
   favorability_completeness %>% mutate(axis = "Completeness")
 )
 
+# Prepare favorability data for the two-panel plot
+favorability_data <- bind_rows(
+  favorability_accuracy %>% mutate(axis = "Accuracy"),
+  favorability_clinical %>% mutate(axis = "Clinical Utility"),
+  favorability_authoritativeness %>% mutate(axis = "Source Quality"),
+  favorability_verifiability %>% mutate(axis = "Verifiability"),
+  favorability_completeness %>% mutate(axis = "Completeness")
+)
+
+# Create the original single panel plot
 p_outcome <- plot_outcome_distribution(outcome_data, sig_data, vendor_order_display)
 p_outcome
 
+# Create the new two-panel plot
+p_outcome_two_panel <- plot_outcome_distribution_two_panel(outcome_data, favorability_data, vendor_order_display)
+p_outcome_two_panel
+
 ggsave(file.path(params$output_dir, "fig_outcome_distribution.pdf"),
        p_outcome, width = 10, height = 6)
+ggsave(file.path(params$output_dir, "fig_outcome_distribution_two_panel.pdf"),
+       p_outcome_two_panel, width = 8, height = 6)
 ```
 
 # Secondary analysis: Win-rate tables
