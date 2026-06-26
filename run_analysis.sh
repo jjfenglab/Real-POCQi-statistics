@@ -28,6 +28,10 @@ echo "## Knitting analysis.Rmd (bootstrap by user)..."
 echo "   -> Outputs: analysis_by_user.html, .RData"
 run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='analysis_by_user'), output_file='analysis_by_user.html', output_dir='${output_dir}')"
 
+echo "## Knitting analysis_healthbench.Rmd..."
+echo "   -> Outputs: analysis_healthbench.html, .RData"
+run Rscript -e "rmarkdown::render('analysis_healthbench.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='analysis_healthbench'), output_file='analysis_healthbench.html', output_dir='${output_dir}')"
+
 echo "## Knitting analysis.Rmd (OE on)..."
 echo "   -> Outputs: analysis_OE_on.html, .RData"
 run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', user_stratification='On OE', output_name='analysis_OE_on'), output_file='analysis_OE_on.html', output_dir='${output_dir}')"
