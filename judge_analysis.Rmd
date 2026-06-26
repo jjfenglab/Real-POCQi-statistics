@@ -443,8 +443,8 @@ create_axis_heatmap <- function(data, axis_name, panel_label, show_y_axis = TRUE
 
   p <- ggplot(plot_data, aes(x = gradee_label, y = grader_label, fill = win_diff_pct)) +
     geom_tile(color = "white", linewidth = 0.5) +
-    geom_text(aes(label = label_pct, fontface = "bold"), size = 3.5, nudge_y = 0.12) +
-    geom_text(aes(label = label_ci), size = 2.5, nudge_y = -0.15) +
+    geom_text(aes(label = label_pct, fontface = "bold"), size = 4, nudge_y = 0.12) +
+    geom_text(aes(label = label_ci), size = 3.2, nudge_y = -0.15) +
     # Add black border for diagonal cells (self-preference)
     geom_tile(data = diagonal_data, color = "black", linewidth = 1.2, fill = NA) +
     scale_fill_gradient2(
