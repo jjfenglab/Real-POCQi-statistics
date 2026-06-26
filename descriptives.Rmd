@@ -260,6 +260,9 @@ irr_per_axis_table <- tibble(
   `Percent agreement` = sapply(irr_passing$per_axis, function(x) {
     sprintf("%.1f%% [%.1f%%, %.1f%%]",
             100 * x$pct_agreement, 100 * x$pct_ci[1], 100 * x$pct_ci[2])
+  }),
+  `Weighted Kappa` = sapply(irr_passing$per_axis, function(x) {
+    sprintf("%.2f [%.2f, %.2f]", x$kappa, x$kappa_ci[1], x$kappa_ci[2])
   })
 )
 

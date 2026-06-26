@@ -27,16 +27,18 @@ calculate_interrater_agreement <- function(qa_ratings, n_boot = 1000, seed = 42)
       score = ifelse(slot_a_is_first, raw_score, 6 - raw_score)
     )
 
-  calc_agreement <- function(data) {
+  calc_agreement <- function(data, id_col = "question_id") {
     pairs <- data %>%
-      group_by(question_id, subversion, vendor_pair, axis) %>%
+      group_by(across(all_of(c(id_col, "subversion", "vendor_pair", "axis")))) %>%
       filter(n() >= 2) %>%
       summarise(scores = list(score), .groups = "drop")
 
     if (nrow(pairs) == 0) {
-      return(c(pct = NA_real_, n_pairs = 0))
+      return(list(pct = NA_real_, kappa = NA_real_, n_pairs = 0))
     }
 
+    rater1 <- c()
+    rater2 <- c()
     n_agree <- 0
     n_total <- 0
     for (i in seq_len(nrow(pairs))) {
@@ -45,11 +47,15 @@ calculate_interrater_agreement <- function(qa_ratings, n_boot = 1000, seed = 42)
       for (j in 1:(n - 1)) {
         for (k in (j + 1):n) {
           n_total <- n_total + 1
+          rater1 <- c(rater1, s[j])
+          rater2 <- c(rater2, s[k])
           if (abs(s[j] - s[k]) <= 1) n_agree <- n_agree + 1
         }
       }
     }
-    c(pct = n_agree / n_total, n_pairs = nrow(pairs))
+
+    kappa_val <- irr::kappa2(cbind(rater1, rater2), weight = "squared")$value
+    list(pct = n_agree / n_total, kappa = kappa_val, n_pairs = nrow(pairs))
   }
 
   axes <- unique(standardized$axis)
@@ -62,26 +68,34 @@ calculate_interrater_agreement <- function(qa_ratings, n_boot = 1000, seed = 42)
   n_questions <- length(question_ids)
   standardized_split <- split(standardized, standardized$question_id)
 
-  boot_per_axis <- lapply(axes, function(ax) numeric(n_boot))
+  boot_per_axis <- lapply(axes, function(ax) list(pct = numeric(n_boot), kappa = numeric(n_boot)))
   names(boot_per_axis) <- axes
 
   for (b in seq_len(n_boot)) {
     boot_idx <- sample(question_ids, n_questions, replace = TRUE)
-    boot_data <- do.call(rbind, standardized_split[boot_idx])
+    boot_data_list <- lapply(seq_along(boot_idx), function(i) {
+      df <- standardized_split[[as.character(boot_idx[i])]]
+      df$boot_question_id <- paste(boot_idx[i], i, sep = "_")
+      df
+    })
+    boot_data <- do.call(rbind, boot_data_list)
 
     for (ax in axes) {
       ax_data <- boot_data[boot_data$axis == ax, ]
-      ax_stats <- calc_agreement(ax_data)
-      boot_per_axis[[ax]][b] <- ax_stats["pct"]
+      ax_stats <- calc_agreement(ax_data, id_col = "boot_question_id")
+      boot_per_axis[[ax]]$pct[b] <- ax_stats$pct
+      boot_per_axis[[ax]]$kappa[b] <- ax_stats$kappa
     }
   }
 
   per_axis_results <- lapply(axes, function(ax) {
     list(
       axis = ax,
-      pct_agreement = observed_per_axis[[ax]]["pct"],
-      pct_ci = quantile(boot_per_axis[[ax]], c(0.025, 0.975), na.rm = TRUE),
-      n_pairs = observed_per_axis[[ax]]["n_pairs"]
+      pct_agreement = observed_per_axis[[ax]]$pct,
+      pct_ci = quantile(boot_per_axis[[ax]]$pct, c(0.025, 0.975), na.rm = TRUE),
+      kappa = observed_per_axis[[ax]]$kappa,
+      kappa_ci = quantile(boot_per_axis[[ax]]$kappa, c(0.025, 0.975), na.rm = TRUE),
+      n_pairs = observed_per_axis[[ax]]$n_pairs
     )
   })
   names(per_axis_results) <- axes
