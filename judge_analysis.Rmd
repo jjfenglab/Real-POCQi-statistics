@@ -12,7 +12,7 @@ params:
   output_dir: null
   output_name: "judge_analysis"
   bootstrap_by: "question"
-  n_boot: 0
+  n_boot: 1000
   n_boot_corr: 0
   unblind: false
 ---
@@ -177,7 +177,7 @@ run_favorability_analysis_simple <- function(df, axis_name, n_boot = 0,
 
     if (n_boot > 0) {
       test_df$user_id <- seq_len(nrow(test_df))
-      test_result <- run_favorability_test(test_df, n_boot = n_boot, ci_level = NULL,
+      test_result <- run_favorability_test(test_df, n_boot = n_boot, ci_level = 0.95,
                                            bootstrap_by = bootstrap_by)
       ci_lower <- test_result$ci_lower
       ci_upper <- test_result$ci_upper
@@ -402,6 +402,8 @@ heatmap_data <- all_favorability %>%
     grader = judge,
     gradee = vendor,
     win_diff_pct = 100 * favorability,
+    ci_lower_pct = 100 * ci_lower,
+    ci_upper_pct = 100 * ci_upper,
     # Get vendor code for grader (for diagonal check)
     grader_vendor_code = case_when(
       grader == "human" ~ NA_character_,
@@ -410,7 +412,7 @@ heatmap_data <- all_favorability %>%
     ),
     is_diagonal = !is.na(grader_vendor_code) & grader_vendor_code == gradee
   ) %>%
-  select(grader, gradee, axis, win_diff_pct, is_diagonal)
+  select(grader, gradee, axis, win_diff_pct, ci_lower_pct, ci_upper_pct, is_diagonal)
 
 # Create display labels for graders and gradees
 heatmap_data <- heatmap_data %>%
@@ -429,14 +431,20 @@ heatmap_data <- heatmap_data %>%
 
 ```{r heatmap_function}
 create_axis_heatmap <- function(data, axis_name, panel_label, show_y_axis = TRUE) {
-  plot_data <- data %>% filter(axis == axis_name)
+  plot_data <- data %>%
+    filter(axis == axis_name) %>%
+    mutate(
+      label_pct = sprintf("%.0f%%", win_diff_pct),
+      label_ci = sprintf("[%.0f, %.0f]", ci_lower_pct, ci_upper_pct)
+    )
 
   # Identify diagonal cells for border highlighting
   diagonal_data <- plot_data %>% filter(is_diagonal)
 
   p <- ggplot(plot_data, aes(x = gradee_label, y = grader_label, fill = win_diff_pct)) +
     geom_tile(color = "white", linewidth = 0.5) +
-    geom_text(aes(label = round(win_diff_pct)), size = 3.5) +
+    geom_text(aes(label = label_pct, fontface = "bold"), size = 3.5, nudge_y = 0.12) +
+    geom_text(aes(label = label_ci), size = 2.5, nudge_y = -0.15) +
     # Add black border for diagonal cells (self-preference)
     geom_tile(data = diagonal_data, color = "black", linewidth = 1.2, fill = NA) +
     scale_fill_gradient2(
