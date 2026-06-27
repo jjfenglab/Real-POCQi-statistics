@@ -51,6 +51,8 @@ def assemble_figure(output_dir: str, output_name: str = "fig_combined.pdf"):
 
     required_files = [
         "fig_outcome_distribution.pdf",
+        "fig_outcome_distribution_two_panel_left.pdf",
+        "fig_outcome_distribution_two_panel_right.pdf",
         "fig_winrate_heatmap_accuracy.pdf",
         "fig_sensitivity_length_accuracy.pdf",
         "fig_sensitivity_oe_accuracy.pdf",
@@ -61,7 +63,18 @@ def assemble_figure(output_dir: str, output_name: str = "fig_combined.pdf"):
             raise FileNotFoundError(f"Missing required file: {output_path / f}")
 
     dpi = 300
-    img_outcome = pdf_to_image(output_path / "fig_outcome_distribution_two_panel.pdf", dpi)
+    img_left = pdf_to_image(output_path / "fig_outcome_distribution_two_panel_left.pdf", dpi)
+    img_right = pdf_to_image(output_path / "fig_outcome_distribution_two_panel_right.pdf", dpi)
+
+    # Resize right panel to match left panel height for row alignment
+    img_right_resized = resize_to_height(img_right, img_left.height)
+
+    # Combine left and right panels
+    gap_panels = 30
+    outcome_width = img_left.width + gap_panels + img_right_resized.width
+    img_outcome = Image.new("RGB", (outcome_width, img_left.height), "white")
+    img_outcome.paste(img_left, (0, 0))
+    img_outcome.paste(img_right_resized, (img_left.width + gap_panels, 0))
     img_heatmap = pdf_to_image(output_path / "fig_winrate_heatmap_accuracy.pdf", dpi)
     img_length = pdf_to_image(output_path / "fig_sensitivity_length_accuracy.pdf", dpi)
     img_oe = pdf_to_image(output_path / "fig_sensitivity_oe_accuracy.pdf", dpi)
@@ -102,7 +115,7 @@ def assemble_figure(output_dir: str, output_name: str = "fig_combined.pdf"):
 
     label_offset = 15
     draw.text((label_offset, label_offset), "A", fill="black", font=font)
-    draw.text((label_offset + img_outcome_resized.width * 0.4, label_offset), "B", fill="black", font=font)
+    draw.text((label_offset + img_outcome_resized.width * 0.45, label_offset), "B", fill="black", font=font)
     draw.text((label_offset, img_outcome_resized.height + gap + label_offset), "C", fill="black", font=font)
     draw.text((img_heatmap_resized.width + gap + label_offset, img_outcome_resized.height + gap + label_offset), "D", fill="black", font=font)
 

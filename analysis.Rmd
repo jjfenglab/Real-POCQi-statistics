@@ -449,8 +449,8 @@ plot_outcome_distribution_two_panel <- function(outcome_data, favorability_data,
     scale_x_continuous(labels = scales::percent) +
     coord_cartesian(xlim = c(0, 1), clip = "off")
 
-  # Combine panels
-  plot_grid(p_left, p_right, ncol = 2, rel_widths = c(0.6, 1), align = "h", axis = "tb")
+  # Return both panels as a list for separate saving
+  list(left = p_left, right = p_right)
 }
 
 get_vendor_order <- function(outcome_data) {
@@ -492,14 +492,17 @@ favorability_data <- bind_rows(
 p_outcome <- plot_outcome_distribution(outcome_data, sig_data, vendor_order_display)
 p_outcome
 
-# Create the new two-panel plot
+# Create the two-panel plots (returned as list)
 p_outcome_two_panel <- plot_outcome_distribution_two_panel(outcome_data, favorability_data, vendor_order_display)
-p_outcome_two_panel
+p_outcome_two_panel$left
+p_outcome_two_panel$right
 
 ggsave(file.path(params$output_dir, "fig_outcome_distribution.pdf"),
        p_outcome, width = 10, height = 6)
-ggsave(file.path(params$output_dir, "fig_outcome_distribution_two_panel.pdf"),
-       p_outcome_two_panel, width = 8, height = 6)
+ggsave(file.path(params$output_dir, "fig_outcome_distribution_two_panel_left.pdf"),
+       p_outcome_two_panel$left, width = 5, height = 6)
+ggsave(file.path(params$output_dir, "fig_outcome_distribution_two_panel_right.pdf"),
+       p_outcome_two_panel$right, width = 6, height = 6)
 ```
 
 # Secondary analysis: Win-rate tables
