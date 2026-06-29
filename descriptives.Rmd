@@ -61,6 +61,14 @@ qa_ratings <- build_qa_ratings(ratings, assignments, questions, users, prior_use
 # Table 1: Descriptive Statistics
 
 ```{r table1}
+# Identify question source based on external_key prefix
+questions <- questions %>%
+  mutate(source = case_when(
+    str_starts(external_key, "oe-") ~ "OE",
+    str_starts(external_key, "healthbench-") ~ "HealthBench",
+    TRUE ~ "Other"
+  ))
+
 n_questions_total <- n_distinct(questions$id)
 n_specialties     <- n_distinct(questions$specialty)
 
@@ -68,7 +76,9 @@ assignments_in_queue <- assignments %>%
   { if (!is.null(prior_users)) filter(., !user_id %in% prior_users$id) else . } %>%
   count(user_id, name = "n_assigned")
 
-summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue, user_registrations) {
+summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue, user_registrations, questions_subset = questions) {
+  n_questions_in_bank <- n_distinct(questions_subset$id)
+  n_specialties_in_bank <- n_distinct(questions_subset$specialty)
   n_axes <- n_distinct(qa_ratings_subset$axis)
 
   mean_ratings_per_axis <- nrow(qa_ratings_subset) / n_axes
@@ -171,8 +181,8 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue, use
     )
 
   c(
-    n_questions_total,
-    n_specialties,
+    n_questions_in_bank,
+    n_specialties_in_bank,
     n_distinct(qa_ratings_subset$question_id),
     sprintf("%.0f", mean_ratings_per_axis),
     ratings_per_vendor_summary,
@@ -210,6 +220,23 @@ summarise_cohort <- function(qa_ratings_subset, users, assignments_in_queue, use
 
 qa_ratings_passing <- apply_inclusion_criteria(qa_ratings)
 
+# Add source to qa_ratings by joining with questions
+qa_ratings <- qa_ratings %>%
+  left_join(questions %>% select(id, source), by = c("question_id" = "id"))
+
+# Create subsets by source
+oe_question_ids <- questions %>% filter(source == "OE") %>% pull(id)
+hb_question_ids <- questions %>% filter(source == "HealthBench") %>% pull(id)
+
+qa_ratings_oe <- qa_ratings %>% filter(question_id %in% oe_question_ids)
+qa_ratings_hb <- qa_ratings %>% filter(question_id %in% hb_question_ids)
+qa_ratings_passing_oe <- qa_ratings_passing %>%
+  left_join(questions %>% select(id, source), by = c("question_id" = "id")) %>%
+  filter(question_id %in% oe_question_ids)
+qa_ratings_passing_hb <- qa_ratings_passing %>%
+  left_join(questions %>% select(id, source), by = c("question_id" = "id")) %>%
+  filter(question_id %in% hb_question_ids)
+
 table1 <- tibble(
   Metric = c(
     "Total questions in question bank",
@@ -230,8 +257,10 @@ table1 <- tibble(
     "Submission time, seconds (mean ± SD)",
     "Submission time, seconds (median [min, max])"
   ),
-  `All ratings` = summarise_cohort(qa_ratings, users, assignments_in_queue, user_registrations),
-  `Submission time ≥ 10s` = summarise_cohort(qa_ratings_passing, users, assignments_in_queue, user_registrations)
+  `All ratings` = summarise_cohort(qa_ratings, users, assignments_in_queue, user_registrations, questions),
+  `Submission time ≥ 10s` = summarise_cohort(qa_ratings_passing, users, assignments_in_queue, user_registrations, questions),
+  `OE only` = summarise_cohort(qa_ratings_oe, users, assignments_in_queue, user_registrations, questions %>% filter(source == "OE")),
+  `HealthBench only` = summarise_cohort(qa_ratings_hb, users, assignments_in_queue, user_registrations, questions %>% filter(source == "HealthBench"))
 )
 
 table1_caption <- paste(
@@ -241,6 +270,18 @@ table1_caption <- paste(
 
 kable(table1, caption = table1_caption) %>%
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+# Restrict subsequent analyses to OE questions only
+
+```{r restrict_to_oe}
+questions <- questions %>% filter(source == "OE")
+qa_ratings <- qa_ratings %>% filter(question_id %in% oe_question_ids)
+qa_ratings_passing <- qa_ratings_passing %>%
+  left_join(questions %>% select(id, source), by = c("question_id" = "id")) %>%
+  filter(question_id %in% oe_question_ids)
+qa_answers <- qa_answers %>%
+  filter(question_id %in% oe_question_ids)
 ```
 
 # Interrater Agreement
