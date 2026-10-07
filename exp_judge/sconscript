@@ -1,0 +1,102 @@
+import os
+from os.path import join as path_join
+
+from dotenv import load_dotenv
+from nestly import Nest
+from nestly.scons import SConsWrap
+from SCons.Script import Import
+
+load_dotenv()
+
+# For SCons - Import env from parent
+Import("env")
+localenv = env.Clone()
+
+# Configuration
+DATA_DIR = "data_6-21-3-56-00pm-nohb"
+ANSWERS_DIR = "public_release_2026_09_22"
+BATCH_SIZE = 10
+
+VARIANTS = [
+    "text_only",
+]
+
+# LLM judges to use (keys from GRADER_MODELS in judge_answers.py)
+JUDGES = [
+    "claude-opus-4-8",
+    "gemini-3.1-pro",
+    "gpt-5.5",
+]
+LIMIT = 100
+
+# Setup nestly
+nest = SConsWrap(Nest(), localenv["output"], alias_environment=localenv)
+
+# Collect per-(variant, judge) jsonl paths so we can concat them after pop.
+# Must be added BEFORE the variant/judge fan-out so it survives pop("variant").
+nest.add_aggregate("judge_jsonls", list)
+
+nest.add("variant", VARIANTS)
+nest.add("judge", JUDGES)
+
+@nest.add_target_with_env(localenv)
+def judge_qa(env, outdir, c):
+    """Run LLM-as-a-judge evaluation for a given variant and judge."""
+    cache_db = path_join("exp_judge", outdir, "cache.db")
+    cmd = [
+        "python src/judge_answers.py",
+        f"--seed 0",
+        f"--data-dir {DATA_DIR}",
+        f"--answers-dir {ANSWERS_DIR}",
+        "--output ${TARGETS[0]}",
+        "--log ${TARGETS[1]}",
+        f"--judge {c['judge']}",
+        f"--variant {c['variant']}",
+        f"--cache-db {cache_db}",
+        f"--batch-size {BATCH_SIZE}",
+        f"--limit {LIMIT}",
+    ]
+
+    targets = [
+        path_join(outdir, "judge_ratings.jsonl"),
+        path_join(outdir, "judge.log")
+    ]
+
+    result = env.Command(targets, [], " ".join(map(str, cmd)))
+    c["judge_jsonls"].append(result[0])
+    return result
+
+nest.pop("variant")
+
+@nest.add_target_with_env(localenv)
+def combine_judge_ratings(env, outdir, c):
+    """Concat all per-(variant, judge) jsonl outputs into one machineRatings.jsonl.
+
+    Written to the SCons output tree so the source machineRatings.jsonl in
+    DATA_DIR is left untouched and available for old-vs-new comparison.
+    """
+    sources = c["judge_jsonls"]
+    targets = [path_join(outdir, "machineRatings.jsonl")]
+    return env.Command(targets, sources, "cat ${SOURCES} > ${TARGET}")
+
+@nest.add_target_with_env(localenv)
+def render_judge_analysis(env, outdir, c):
+    """Render judge_analysis.Rmd against the newly combined machineRatings.jsonl."""
+    cmd = [
+        'Rscript -e "rmarkdown::render(',
+        "'judge_analysis.Rmd',",
+        f"params=list(data_dir='{DATA_DIR}', output_dir='{path_join("exp_judge", outdir)}', "
+        "machine_ratings_path='${SOURCES[0]}', "
+        f"output_name='judge_analysis', unblind=TRUE), "
+        "output_file='${TARGETS[0]}',",
+        f"output_dir='{path_join("exp_judge", outdir)}')",
+        '"'
+    ]
+
+    sources = c["combine_judge_ratings"]
+    targets = [
+        path_join(outdir, f"judge_analysis.html"),
+        # path_join(outdir, f"{output_name}_grader_gradee_heatmap.pdf"),
+        # path_join(outdir, f"{output_name}_grader_gradee_heatmap.png"),
+    ]
+    return env.Command(targets, sources, " ".join(map(str, cmd)))
