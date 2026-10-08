@@ -26,7 +26,7 @@ run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_d
 
 echo "## Knitting analysis.Rmd (bootstrap by user)..."
 echo "   -> Outputs: analysis_by_user.html, .RData"
-run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', output_name='analysis_by_user'), output_file='analysis_by_user.html', output_dir='${output_dir}')"
+run Rscript -e "rmarkdown::render('analysis.Rmd', params=list(data_dir='${data_dir}', output_dir='${output_dir}', bootstrap_by='user', output_name='analysis_by_user'), output_file='analysis_by_user.html', output_dir='${output_dir}')"
 
 echo "## Knitting analysis_healthbench.Rmd..."
 echo "   -> Outputs: analysis_healthbench.html, .RData"

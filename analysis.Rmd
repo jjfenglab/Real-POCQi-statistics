@@ -903,12 +903,15 @@ favorability_data_citations <- bind_rows(
 p_outcome_citations_two_panel <- plot_outcome_distribution_two_panel(outcome_data_citations,
                                                                       favorability_data_citations,
                                                                       vendor_order_citations_display)
-p_outcome_citations_two_panel
+p_outcome_citations_two_panel$left
+p_outcome_citations_two_panel$right
 
 ggsave(file.path(params$output_dir, "fig_outcome_distribution_citations.pdf"),
        p_outcome_citations, width = 10, height = 6)
-ggsave(file.path(params$output_dir, "fig_outcome_distribution_citations_two_panel.pdf"),
-       p_outcome_citations_two_panel, width = 8, height = 6)
+ggsave(file.path(params$output_dir, "fig_outcome_distribution_citations_two_panel_left.pdf"),
+       p_outcome_citations_two_panel$left, width = 5, height = 6)
+ggsave(file.path(params$output_dir, "fig_outcome_distribution_citations_two_panel_right.pdf"),
+       p_outcome_citations_two_panel$right, width = 6, height = 6)
 ```
 
 # Sensitivity analysis: Strict win-rate tables
