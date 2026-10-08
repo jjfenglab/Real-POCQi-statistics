@@ -11,6 +11,7 @@ params:
   data_dir: null
   output_dir: null
   output_name: "judge_analysis"
+  machine_ratings_path: null
   bootstrap_by: "question"
   n_boot: 1000
   n_boot_corr: 0
@@ -33,6 +34,7 @@ source("data_helpers.R")
 ```{r params, echo=FALSE, results='asis'}
 cat(sprintf("- **Data directory:** `%s`\n", params$data_dir))
 cat(sprintf("- **Output directory:** `%s`\n", ifelse(is.null(params$output_dir), params$data_dir, params$output_dir)))
+cat(sprintf("- **Machine ratings:** `%s`\n", ifelse(is.null(params$machine_ratings_path), file.path(params$data_dir, "machineRatings.jsonl"), params$machine_ratings_path)))
 cat(sprintf("- **Bootstrap by:** %s\n", params$bootstrap_by))
 cat(sprintf("- **N bootstrap (favorability):** %d\n", params$n_boot))
 cat(sprintf("- **N bootstrap (correlation CI):** %d\n", params$n_boot_corr))
@@ -89,7 +91,12 @@ Machine ratings are joined to assignments via `assignmentId` to get the
 question_id and blinded slot vendors.
 
 ```{r load_machine}
-machine_raw <- stream_in(file(file.path(data_dir, "machineRatings.jsonl")), verbose = FALSE)
+machine_ratings_path <- if (!is.null(params$machine_ratings_path)) {
+  params$machine_ratings_path
+} else {
+  file.path(data_dir, "machineRatings.jsonl")
+}
+machine_raw <- stream_in(file(machine_ratings_path), verbose = FALSE)
 
 choices_df <- machine_raw$choices
 choices_df$row_id <- seq_len(nrow(choices_df))
