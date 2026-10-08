@@ -1,7 +1,6 @@
 """LLM-as-a-judge evaluation for clinical Q&A answers.
 
 Replays the human Q&A preference pairs to LLM graders using higher reasoning effort.
-This is a Python reimplementation of the original TypeScript machineRate.ts.
 
 Usage:
     python src/judge_answers.py \
@@ -79,7 +78,6 @@ CHOICE_GLOSS = {
 # Model Configuration
 # -----------------------------------------------------------------------------
 
-# TODO: Update these model mappings when llm-api supports the exact versions
 GRADER_MODELS = {
     "claude-opus-4-8": "anthropic/claude-opus-4-8",
     "gemini-3.1-pro": "gemini/gemini-3.1-pro-preview",
@@ -523,6 +521,7 @@ async def run_judging(
         max_parallel_jobs=batch_size,
         temperature=temperature,
         response_format=JudgeRating,
+        return_exceptions=True,
         **reasoning_params,
     )
 

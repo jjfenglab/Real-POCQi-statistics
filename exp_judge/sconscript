@@ -27,7 +27,6 @@ JUDGES = [
     "gemini-3.1-pro",
     "gpt-5.5",
 ]
-LIMIT = 100
 
 # Setup nestly
 nest = SConsWrap(Nest(), localenv["output"], alias_environment=localenv)
@@ -54,7 +53,6 @@ def judge_qa(env, outdir, c):
         f"--variant {c['variant']}",
         f"--cache-db {cache_db}",
         f"--batch-size {BATCH_SIZE}",
-        f"--limit {LIMIT}",
     ]
 
     targets = [
