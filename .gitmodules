@@ -1,0 +1,3 @@
+[submodule "bc-llm"]
+	path = bc-llm
+	url = git@github.com:jjfeng/bc-llm.git
