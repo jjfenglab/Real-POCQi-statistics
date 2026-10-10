@@ -46,7 +46,7 @@ AXES = [
     # "completeness",
 ]
 SEEDS = [0]
-LLM_MODEL = "openai/gpt-4.1-mini-2025-04-14" # TODO -- something better since this is open-source data?
+LLM_MODEL = "anthropic/claude-haiku-5-5"
 
 # Setup nestly
 nest = SConsWrap(Nest(), localenv["output"], alias_environment=localenv)
@@ -54,7 +54,7 @@ nest = SConsWrap(Nest(), localenv["output"], alias_environment=localenv)
 nest.add("variant", VARIANTS)
 nest.add("axis", AXES)
 nest.add("max_n", [
-    4,  # control max sample size for testing
+    50,  # control max sample size for testing
     # 10000,  # use all the data
 ])
 nest.add("seed", SEEDS, label_func=lambda s: f"seed_{s}")
@@ -71,6 +71,7 @@ def assemble_pairs(env, outdir, c):
         f"--max-n {c['max_n']}",
         f"--seed {c['seed']}",
         "--test-frac 0.2",
+        "--drop-ties",
         "--out-csv ${TARGETS[0]}",
         "--out-indices-csv ${TARGETS[1]}",
         "--log ${TARGETS[2]}",

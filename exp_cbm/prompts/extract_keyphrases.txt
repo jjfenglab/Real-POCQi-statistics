@@ -1,0 +1,60 @@
+You will be shown a clinical question followed by two candidate answers (Answer A and Answer B).
+
+"{note}"
+
+Your job is to summarize the *differences* between Answer A and Answer B as a list of comparative keyphrases, which will be used by a bag-of-words model to find characteristics that lead to an expert clinician rater preferring a particular answer. The keyphrases must be **general enough to apply across unrelated clinical domains** (e.g., a phrase extracted from a dermatology question should still be meaningful for a cardiology or nephrology question). Hyper-specific phrases are useless to the model because they will not recur.
+
+A keyphrase must be of the form "______: A > B" or "______: B > A".
+
+The blank must be a **general property of a clinical answer**, not a specific clinical entity. To help you brainstorm, here are the main axes of variation that distinguish clinical answers:
+- Content coverage: comprehensive, concise, breadth, depth
+- Audience: clinical, patient, academic, technical, lay
+- Evidence basis: guidelines, trials, evidence-based, mechanism-based, research-oriented vs. pragmatic
+- Clinical reasoning: mechanistic, differential reasoning, probabilistic reasoning, evidence-based reasoning
+- Recommendations: practical, more patient-specific, specific vs general, prescriptive vs tentative, assertive, nuanced, more caveats vs fewer caveats
+- Safety: more risk-aware, more side effects, more contraindications
+- Structure: longer vs shorter, more vs less concise, more or fewer tables, more or fewer lists
+
+Guidelines:
+- **The phrase before the colon must be 2-3 words.** Hard cap at 3 words.
+- **The phrase must not name any specific clinical entity** — no disease, drug, organ, body part, lesion feature, test, procedure, or named guideline (e.g., no "biopsy", "ECMO", "NCCN", "lesion", "corticosteroid", "staging", "lymphadenopathy", "pharmacokinetics"). If a difference is tied to a specific entity, abstract it up to the general category — or drop it if no general category fits.
+- Examples of abstracting up (BAD → GOOD):
+    - "more detailed staging: B > A" → "more diagnostic detail: B > A"
+    - "more ECMO pharmacokinetics: B > A" → "more pharmacologic detail: B > A"
+    - "more emphasis on lesion morphology: A > B" → "more exam detail: A > B" (or drop)
+    - "more emphasis on lesion color: A > B" → drop (too specific; no good abstraction)
+    - "includes NCCN guidelines: B > A" → "more guideline references: B > A"
+    - "more biopsy mention: A > B" → "more diagnostic workup: A > B"
+- For each keyphrase, also list some synonyms and generalizations. **Synonyms must be alternate wordings of the same general concept, not a list of specific sub-aspects.**
+    - GOOD synonym bundle (same concept, different wordings): "more diagnostic detail: A > B, more workup detail: A > B, more investigation detail: A > B"
+    - BAD synonym bundle (sibling specifics masquerading as synonyms): "more emphasis on lesion color: A > B, more emphasis on lesion texture: A > B, more emphasis on lesion morphology: A > B"
+- Synonyms also include switching the comparison sign between A > B and B > A, e.g., "more clinical details: A > B" and "fewer clinical details: B > A"
+- Keyphrases, synonyms, and generalizations can be comma-separated or listed as separate strings
+- If a property is present in both answers to a similar degree, do not include it (it is not a difference).
+- Only focus on properties of the single-round QA, ignore follow-up offers.
+- Return up to 30 entries.
+
+Output JSON in the following format:
+{
+    "reasoning": "<ONE-TO-TWO SENTENCE RATIONALE FOR THE KEYPHRASES CHOSEN>",
+    "keyphrases": [
+        "<KEYPHRASE_1_AND_SYNONYMS>",
+        "<KEYPHRASE_2_AND_SYNONYMS>",
+        ...
+    ]
+}
+
+Example:
+{
+    "reasoning": "The answers differ primarily in evidence citations and dosing specificity.",
+    "keyphrases": [
+        "more recent guidelines: A > B, less recent guidelines: B > A",
+        "more specific dosing: A > B, less dosing information: B > A",
+        "more side effect information: A > B, less side effect information: B > A",
+        "more clinical details: A > B",
+        "more medication details: A > B",
+        "more management instructions: A > B",
+        "more for patient audience: B > A, more for clinical audience: A > B",
+        "longer answer: B > A, shorter answer: A > B"
+    ]
+}

@@ -22,8 +22,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# Reuse the gold-standard loading + eligibility logic.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.judge_answers import build_eligible_assignments, load_data
 
 # Choices from the rating UI → sign of the preference for answer A.
@@ -35,6 +34,7 @@ CHOICE_TO_LABEL = {
     "strongly_b": 2,
 }
 LABEL_FLIP = {0: 2, 1: 1, 2: 0}
+LABEL_FLIP_BINARY = {0: 1, 1: 0}
 
 
 def parse_args():
@@ -47,6 +47,7 @@ def parse_args():
                    help="Directory containing answers_<variant>.jsonl.")
     p.add_argument("--variant", required=True,
                    help="Answer variant, e.g. 'text_only' or 'text_with_citations'.")
+    p.add_argument("--drop-ties", action="store_true", help="exclude ties")
     p.add_argument("--axis", required=True,
                    help="Rating axis to filter to (e.g. clinical_utility)")
     p.add_argument("--max-n", type=int, default=0,
@@ -155,9 +156,18 @@ def main():
     logging.info("pre-subsample train/test split: %s",
                  df["partition"].value_counts().to_dict())
 
-    if args.max_n and args.max_n < len(df):
-        df = df.sample(n=args.max_n, random_state=args.seed).reset_index(drop=True)
-        logging.info("subsampled to %d rows", len(df))
+    if args.drop_ties:
+        before = len(df)
+        df = df[df["y"] != 1].copy()
+        # Collapse {0, 2} → {0, 1} so the label space is binary.
+        df["y"] = (df["y"] // 2).astype(int)
+        logging.info("drop-ties: %d → %d rows (binary labels); split now %s",
+                     before, len(df), df["partition"].value_counts().to_dict())
+
+    # Shuffle the data and then take the first max_n rows
+    df = df.sample(n=len(df), random_state=args.seed).reset_index(drop=True)
+    df = df.iloc[:args.max_n]
+    logging.info("subsampled to %d rows", len(df))
 
     df["rater_id"] = df["user_id"]
 
@@ -190,7 +200,9 @@ def main():
         "text_b": df["text_a"].values,
         "sentence": [pack_sentence(q, b, a) for q, a, b in
                      zip(df["question_text"], df["text_a"], df["text_b"])],
-        "y": df["y"].astype(int).map(LABEL_FLIP).values,
+        "y": df["y"].astype(int).map(
+            LABEL_FLIP_BINARY if args.drop_ties else LABEL_FLIP
+        ).values,
         "is_augmented": True,
         "partition": df["partition"].values,
     })

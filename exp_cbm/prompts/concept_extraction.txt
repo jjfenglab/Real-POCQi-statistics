@@ -1,0 +1,31 @@
+You will be given a clinical question together with two candidate answers (Answer A and Answer B). I will give you a series of comparative questions about these two answers. For each question, respond 1 of 3 values:
+*  1  = more true of Answer A than Answer B
+*  0  = equally true of both answers, or neither
+* -1  = more true of Answer B than Answer A
+
+Treat the two answers symmetrically: do not favor whichever answer appears first.
+
+Questions:
+{prompt_questions}
+
+Clinical question and candidate answers:
+{sentence}
+
+Return a JSON of the following form:
+{
+    "extractions":
+    [
+        {
+            "question_id": 1,
+            "reasoning": "<ONE-SENTENCE RATIONALE>",
+            "answer": -1
+        },
+        {
+            "question_id": 2,
+            "reasoning": "<ONE-SENTENCE RATIONALE>",
+            "answer": 0
+        }
+    ]
+}
+
+Answer all the questions. Return valid JSON only, with no additional commentary.
