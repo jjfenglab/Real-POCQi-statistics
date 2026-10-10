@@ -1,1 +1,9 @@
 secret_mapping.txt
+*.db
+*.html
+data_*
+public_*
+_output
+.DS_Store
+.RData
+.Rhistory

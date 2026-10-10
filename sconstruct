@@ -25,3 +25,6 @@ sc.SConscript(flag + "/sconscript", exports=["flag"])
 
 flag = "exp_judge"
 sc.SConscript(flag + "/sconscript", exports=["flag"])
+
+flag = "exp_cbm"
+sc.SConscript(flag + "/sconscript", exports=["flag"])

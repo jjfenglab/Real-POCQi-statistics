@@ -1,3 +1,6 @@
-[submodule "bc-llm"]
-	path = bc-llm
-	url = git@github.com:jjfeng/bc-llm.git
+[submodule "bc-llm-head-to-head"]
+	path = bc-llm-head-to-head
+	url = git@github.com:jjfenglab/bc-llm-head-to-head.git
+[submodule "HACHI"]
+	path = HACHI
+	url = git@github.com:jjfenglab/HACHI.git
