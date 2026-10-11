@@ -2,7 +2,7 @@ We are fitting a concept bottleneck model (CBM) that predicts which of two candi
 
 Each meta-concept is a *comparative* yes/no question of the form "Does Answer B ___ more than Answer A?" — for example, "Does Answer B cite more recent evidence than Answer A?" or "Does Answer B give more specific recommendations than Answer A?". Each concept will later be scored on {-1, 0, 1}: 1 means the property is clearly more true of B than A, -1 means clearly more true of A than B, and 0 means equally true of both or neither.
 
-Below are the top keyphrase *clusters* most associated with the outcome Y. Keyphrases were extracted per (Q, A, B) triple in the form "<property>: A > B" or "<property>: B > A", then clustered with BERTopic — separately for A>B and B>A phrases so a cluster never mixes directions. Each cluster is shown with its total count (n) and the most frequent member keyphrases (with their counts). The clusters themselves are ranked by how strongly their presence predicts Y in a logistic regression.
+Below are the top keyphrase *clusters* most associated with the outcome Y. Keyphrases were extracted per (Q, A, B) triple in the form "<property>: A > B" or "<property>: B > A", then clustered with BERTopic — separately for A>B and B>A phrases so a cluster never mixes directions. Each cluster is shown with its total count (n), its signed logistic-regression coefficient (coef), and the most frequent member keyphrases (with their counts). A positive coef means the cluster's presence predicts Y=1 (Answer B wins); a negative coef means it predicts Y=0 (Answer A wins). Clusters are listed in descending order of |coef|.
 
 Top clusters:
 
@@ -34,15 +34,15 @@ Example:
     [
       {
           "concept": "Does Answer B provide more practical guidance than Answer A?",
-          "words": "more practical: B > A, less practical: A > B"
+          "words": ["more practical: B > A", "less practical: A > B"]
       },
       {
           "concept": "Does Answer B emphasize safety considerations more than Answer A?",
-          "words": "more safety-aware: B > A, fewer safety considerations: A > B"
+          "words": ["more safety-aware: B > A", "fewer safety considerations: A > B"]
       },
       {
           "concept": "Is Answer B shorter than Answer A?",
-          "words": "longer: A > B, shorter answer: B > A"
+          "words": ["longer: A > B", "shorter answer: B > A"]
       }
     ]
 }

@@ -34,15 +34,15 @@ Example:
     [
       {
           "concept": "Does Answer B provide more practical guidance than Answer A?",
-          "words": "more practical: B > A, less practical: A > B"
+          "words": ["more practical: B > A", "less practical: A > B"]
       },
       {
           "concept": "Does Answer B emphasize safety considerations more than Answer A?",
-          "words": "more safety-aware: B > A, fewer safety considerations: A > B"
+          "words": ["more safety-aware: B > A", "fewer safety considerations: A > B"]
       },
       {
           "concept": "Is Answer B shorter than Answer A?",
-          "words": "longer: A > B, shorter answer: B > A"
+          "words": ["longer: A > B", "shorter answer: B > A"]
       }
     ]
 }
