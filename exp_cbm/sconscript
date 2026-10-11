@@ -40,9 +40,9 @@ VARIANTS = [
 AXES = [
     # "clinical_utility",
     # "accuracy",
-    # "authoritativeness",
+    "authoritativeness",
     # "verifiability",
-    "completeness",
+    # "completeness",
 ]
 SEEDS = [0]
 LLM_MODEL = "anthropic/claude-haiku-5-5"
@@ -53,10 +53,14 @@ nest = SConsWrap(Nest(), localenv["output"], alias_environment=localenv)
 nest.add("variant", VARIANTS)
 nest.add("axis", AXES)
 nest.add("max_n", [
-    100,  # control max sample size for testing
-    # 700,  # use all the data
+    # 100,  # control max sample size for testing
+    700,  # use all the data
 ])
 nest.add("seed", SEEDS, label_func=lambda s: f"seed_{s}")
+nest.add("only_extremes", [
+    True,
+    # False
+])
 
 
 @nest.add_target_with_env(localenv)
@@ -70,6 +74,7 @@ def assemble_pairs(env, outdir, c):
         f"--max-n {c['max_n']}",
         f"--seed {c['seed']}",
         # "--no-augment",
+        "--only-extremes" if c["only_extremes"] else "",
         "--test-frac 0.2",
         "--drop-ties",
         "--out-csv ${TARGETS[0]}",
@@ -168,8 +173,8 @@ def fit_cbm(env, outdir, c):
         "--text-summary-column llm_output",
         f"--llm-model-type {LLM_MODEL}",
         f"--num-meta-concepts {c['num_meta_concepts']}",
-        f"--max-epochs {1 if c['max_n'] <= 200 else MAX_EPOCHS}",
-        f"--num-greedy-epochs {1 if c['max_n'] <= 200 else NUM_GREEDY_EPOCHS}",
+        f"--max-epochs {0 if c['max_n'] <= 200 else MAX_EPOCHS}",
+        f"--num-greedy-epochs {0 if c['max_n'] <= 200 else NUM_GREEDY_EPOCHS}",
         f"--batch-size 100",
         "--batch-concept-size 20",
         "--batch-obs-size 1",
@@ -184,6 +189,8 @@ def fit_cbm(env, outdir, c):
         "--aucs-plot-file ${TARGETS[0]}",
         f"--out-extractions-file {extractions_pkl}",
         f"--log-file {log_file}",
+        "--use-bertopic-init",
+        "--bertopic-init exp_cbm/prompts/baseline_init_bertopic.txt"
     ]
     sources = [
         c["extract_keyphrases"][0],  # pairs_with_keyphrases.csv
@@ -228,7 +235,7 @@ def fit_cbm(env, outdir, c):
 #     training_history = path_join("exp_cbm/", outdir, "training_history.pkl")
 #     test_extractions = path_join("exp_cbm/", outdir, "test_extractions.pkl")
 #     num_posterior_iters = (
-#         1 if c['max_n'] <= 200 else MAX_EPOCHS
+#         1 if c['max_n'] <= 200 else (MAX_EPOCHS + 1)
 #     ) * c['num_meta_concepts']
 #     cmd = [
 #         f"PYTHONPATH={BC_LLM_DIR}",
@@ -266,28 +273,28 @@ def fit_cbm(env, outdir, c):
 #     return env.Command(targets, sources, " ".join(cmd))
 
 
-# @nest.add_target_with_env(localenv)
-# def export_concepts(env, outdir, c):
-#     """
-#     Dump the learned concepts and fitted linear-model coefficients from
-#     the trailing posterior iterations into a CSV for later inspection.
-#     """
-#     training_history = path_join("exp_cbm/", outdir, "training_history.pkl")
-#     num_posterior_iters = (
-#         1 if c['max_n'] <= 200 else MAX_EPOCHS
-#     ) * c['num_meta_concepts']
-#     cmd = [
-#         "python exp_cbm/scripts/export_concepts_csv.py",
-#         f"--training-history-file {training_history}",
-#         f"--num-posterior-iters {num_posterior_iters}",
-#         "--out-csv ${TARGETS[0]}",
-#         "--log-file ${TARGETS[1]}",
-#     ]
-#     sources = [
-#         c["fit_cbm"][0],  # dependency on training completion
-#     ]
-#     targets = [
-#         path_join(outdir, "concepts.csv"),
-#         path_join(outdir, "export_concepts.log"),
-#     ]
-#     return env.Command(targets, sources, " ".join(cmd))
+# # @nest.add_target_with_env(localenv)
+# # def export_concepts(env, outdir, c):
+# #     """
+# #     Dump the learned concepts and fitted linear-model coefficients from
+# #     the trailing posterior iterations into a CSV for later inspection.
+# #     """
+# #     training_history = path_join("exp_cbm/", outdir, "training_history.pkl")
+# #     num_posterior_iters = (
+# #         1 if c['max_n'] <= 200 else MAX_EPOCHS
+# #     ) * c['num_meta_concepts']
+# #     cmd = [
+# #         "python exp_cbm/scripts/export_concepts_csv.py",
+# #         f"--training-history-file {training_history}",
+# #         f"--num-posterior-iters {num_posterior_iters}",
+# #         "--out-csv ${TARGETS[0]}",
+# #         "--log-file ${TARGETS[1]}",
+# #     ]
+# #     sources = [
+# #         c["fit_cbm"][0],  # dependency on training completion
+# #     ]
+# #     targets = [
+# #         path_join(outdir, "concepts.csv"),
+# #         path_join(outdir, "export_concepts.log"),
+# #     ]
+# #     return env.Command(targets, sources, " ".join(cmd))

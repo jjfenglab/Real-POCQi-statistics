@@ -27,6 +27,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.judge_answers import build_eligible_assignments, load_data
 
 # Choices from the rating UI → sign of the preference for answer A.
+CHOICE_TO_LABEL_EXTREMES = {
+    "strongly_a": 0,
+    "strongly_b": 2,
+}
 CHOICE_TO_LABEL = {
     "strongly_a": 0,
     "slightly_a": 0,
@@ -49,6 +53,7 @@ def parse_args():
     p.add_argument("--variant", required=True,
                    help="Answer variant, e.g. 'text_only' or 'text_with_citations'.")
     p.add_argument("--drop-ties", action="store_true", help="exclude ties")
+    p.add_argument("--only-extremes", action="store_true", help="only including strong preferences")
     p.add_argument("--augment", dest="augment", action="store_true",
                    help="Emit a swap-augmented sibling (A↔B, label flipped) "
                         "for every original rating. On by default.")
@@ -108,6 +113,7 @@ def filter_ratings_to_axis(
     ratings: pd.DataFrame,
     eligible_assignments: pd.DataFrame,
     axis: str,
+    mapping_dict: dict,
 ) -> pd.DataFrame:
     axis_ratings = ratings[ratings["axis"] == axis].copy()
     logging.info("after axis=%s filter: %d ratings", axis, len(axis_ratings))
@@ -116,7 +122,9 @@ def filter_ratings_to_axis(
     axis_ratings = axis_ratings[axis_ratings["qa_assignment_id"].isin(eligible_ids)]
     logging.info("after eligibility filter: %d ratings", len(axis_ratings))
 
-    axis_ratings["y"] = axis_ratings["choice"].map(CHOICE_TO_LABEL)
+    axis_ratings = axis_ratings[axis_ratings.choice.isin(list(mapping_dict.keys()))]
+
+    axis_ratings["y"] = axis_ratings["choice"].map(mapping_dict)
     assert axis_ratings["y"].notna().all(), (
         "unmapped choice values: "
         f"{sorted(axis_ratings.loc[axis_ratings['y'].isna(), 'choice'].unique())}"
@@ -323,7 +331,11 @@ def main():
         eligible_assignments, args.test_frac, args.seed
     )
 
-    axis_ratings = filter_ratings_to_axis(ratings, eligible_assignments, args.axis)
+    axis_ratings = filter_ratings_to_axis(
+        ratings,
+        eligible_assignments,
+        args.axis,
+        mapping_dict=CHOICE_TO_LABEL_EXTREMES if args.only_extremes else CHOICE_TO_LABEL)
     df = join_rating_context(axis_ratings, eligible_assignments, questions, answers_by_key)
 
     df["partition"] = np.where(df["qa_assignment_id"].isin(test_clusters), "test", "train")
