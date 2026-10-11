@@ -31,18 +31,18 @@ ANSWERS_DIR = "public_release_2026_09_22"
 BC_LLM_DIR = "bc-llm-head-to-head"
 
 BATCH_SIZE = 20
-MAX_EPOCHS = 1
-NUM_GREEDY_EPOCHS = 1
+MAX_EPOCHS = 0
+NUM_GREEDY_EPOCHS = 0
 
 VARIANTS = [
     "text_only",
 ]
 AXES = [
     "clinical_utility",
-    # "accuracy",
-    # "authoritativeness",
-    # "verifiability",
-    # "completeness",
+    "accuracy",
+    "authoritativeness",
+    "verifiability",
+    "completeness",
 ]
 SEEDS = [0]
 LLM_MODEL = "anthropic/claude-haiku-5-5"
