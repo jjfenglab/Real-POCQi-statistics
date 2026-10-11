@@ -1,0 +1,298 @@
+"""
+Use BC-LLM to fit a Concept Bottleneck Model and figure out which concepts
+drive expert win-rates on the clinical QA head-to-head ratings. One CBM is
+fit per rating axis.
+
+Symmetry is enforced through *data augmentation*: each original rating
+(Q, A, B, y) is paired with a swapped sibling (Q, B, A, flip(y)) sharing a
+qa_assignment_id. The forked bc-llm honors --cluster-column so the Laplace
+partial-posterior split keeps augmented siblings together.
+"""
+import os
+from os.path import join as path_join
+
+from dotenv import load_dotenv
+from nestly import Nest
+from nestly.scons import SConsWrap
+from SCons.Script import Import
+
+load_dotenv()
+
+# For SCons - Import env from parent
+Import("env")
+localenv = env.Clone()
+
+# Configuration
+DATA_DIR = "data_6-21-3-56-00pm-nohb"
+ANSWERS_DIR = "public_release_2026_09_22"
+
+# BC-LLM fork lives as a submodule; scripts and prompts are referenced
+# relative to the repo root (SCons' CWD).
+BC_LLM_DIR = "bc-llm-head-to-head"
+
+BATCH_SIZE = 20
+MAX_EPOCHS = 0
+NUM_GREEDY_EPOCHS = 0
+
+VARIANTS = [
+    "text_only",
+]
+AXES = [
+    "clinical_utility",
+    "accuracy",
+    "authoritativeness",
+    "verifiability",
+    "completeness",
+]
+SEEDS = [0]
+LLM_MODEL = "anthropic/claude-haiku-5-5"
+
+# Setup nestly
+nest = SConsWrap(Nest(), localenv["output"], alias_environment=localenv)
+
+nest.add("variant", VARIANTS)
+nest.add("axis", AXES)
+nest.add("max_n", [
+    # 100,  # control max sample size for testing
+    700,  # use all the data
+])
+nest.add("seed", SEEDS, label_func=lambda s: f"seed_{s}")
+
+
+@nest.add_target_with_env(localenv)
+def assemble_pairs(env, outdir, c):
+    cmd = [
+        "python src/assemble_cbm_pairs.py",
+        f"--data-dir {DATA_DIR}",
+        f"--answers-dir {ANSWERS_DIR}",
+        f"--variant {c['variant']}",
+        f"--axis {c['axis']}",
+        f"--max-n {c['max_n']}",
+        f"--seed {c['seed']}",
+        # "--no-augment",
+        "--test-frac 0.2",
+        "--drop-ties",
+        "--out-csv ${TARGETS[0]}",
+        "--out-indices-csv ${TARGETS[1]}",
+        "--log ${TARGETS[2]}",
+    ]
+    targets = [
+        path_join(outdir, "pairs.csv"),
+        path_join(outdir, "indices.csv"),
+        path_join(outdir, "assemble.log"),
+    ]
+    return env.Command(targets, [], " ".join(cmd))
+
+@nest.add_target_with_env(localenv)
+def blackbox_embedding(env, outdir, c):
+    """
+    Upper-bound baseline: embed the full QA `sentence` with a
+    SentenceTransformer and fit a cross-validated L2 logistic regression
+    on the train partition, then evaluate on the test partition. Results
+    CSV columns match evaluate_cbm so the two methods are comparable.
+    """
+    cmd = [
+        "python exp_cbm/scripts/train_eval_blackbox.py",
+        f"--seed {c['seed']}",
+        "--in-dataset-file ${SOURCES[0]}",
+        "--indices-csv ${SOURCES[1]}",
+        "--embedding-model-name all-MiniLM-L6-v2",
+        "--method-name blackbox_embedding",
+        "--out-model ${TARGETS[0]}",
+        "--result-csv-file ${TARGETS[1]}",
+        "--log-file ${TARGETS[2]}",
+    ]
+    sources = [
+        c["assemble_pairs"][0],  # pairs.csv
+        c["assemble_pairs"][1],  # indices.csv
+    ]
+    targets = [
+        path_join(outdir, "blackbox_model.pkl"),
+        path_join(outdir, "blackbox_test_results.csv"),
+        path_join(outdir, "blackbox.log"),
+    ]
+    return env.Command(targets, sources, " ".join(cmd))
+
+@nest.add_target_with_env(localenv)
+def extract_keyphrases(env, outdir, c):
+    """
+    Per-pair LLM pass that emits comparative keyphrases describing how
+    Answer A differs from Answer B. The resulting llm_output column
+    becomes the vocabulary for the bag-of-words model whose top words
+    seed the initial concept-brainstorming prompt in fit_cbm.
+    """
+    cache_db = path_join(f"exp_cbm/_output/cache_{c['seed']}.db")
+    cmd = [
+        f"PYTHONPATH={BC_LLM_DIR}",
+        f"python {BC_LLM_DIR}/scripts/extract_keyphrases.py",
+        "--use-api",
+        f"--seed {c['seed']}",
+        f"--cache-file {cache_db}",
+        "--in-dataset-file ${SOURCES[0]}",
+        "--indices-file ${SOURCES[1]}",
+        "--prompt-file exp_cbm/prompts/extract_keyphrases.txt",
+        f"--llm-model-type {LLM_MODEL}",
+        f"--batch-size {BATCH_SIZE}",
+        "--num-new-tokens 2000",
+        "--llm-outputs-file ${TARGETS[0]}",
+        "--log-file ${TARGETS[1]}",
+    ]
+    sources = [
+        c["assemble_pairs"][0],  # pairs.csv
+        c["assemble_pairs"][1],  # indices.csv
+    ]
+    targets = [
+        path_join(outdir, "pairs_with_keyphrases.csv"),
+        path_join(outdir, "extract_keyphrases.log"),
+    ]
+    return env.Command(targets, sources, " ".join(cmd))
+
+nest.add("num_meta_concepts", [
+    5,
+])
+
+@nest.add_target_with_env(localenv)
+def fit_cbm(env, outdir, c):
+    cache_db = path_join(f"exp_cbm/_output/cache_{c['seed']}.db")
+    log_file = path_join("exp_cbm/", outdir, "training.log")
+    training_history = path_join("exp_cbm/", outdir, "training_history.pkl")
+    extractions_pkl = path_join("exp_cbm/", outdir, "extractions.pkl")
+    cmd = [
+        f"PYTHONPATH={BC_LLM_DIR}",
+        f"python {BC_LLM_DIR}/scripts/train_bc_llm.py",
+        "--use-api",
+        f"--seed {c['seed']}",
+        f"--cache-file {cache_db}",
+        "--in-dataset-file ${SOURCES[0]}",
+        "--indices-csv ${SOURCES[1]}",
+        "--text-summary-column llm_output",
+        f"--llm-model-type {LLM_MODEL}",
+        f"--num-meta-concepts {c['num_meta_concepts']}",
+        f"--max-epochs {0 if c['max_n'] <= 200 else MAX_EPOCHS}",
+        f"--num-greedy-epochs {0 if c['max_n'] <= 200 else NUM_GREEDY_EPOCHS}",
+        f"--batch-size 100",
+        "--batch-concept-size 20",
+        "--batch-obs-size 1",
+        "--learner-type count_l2",
+        "--inverse-penalty-param 20000",
+        "--baseline-init-file exp_cbm/prompts/baseline_init.txt",
+        "--prompt-concepts-file exp_cbm/prompts/concept_extraction.txt",
+        "--prompt-iter-file exp_cbm/prompts/bayesian_iter.txt",
+        "--prompt-prior-file exp_cbm/prompts/baseline_init.txt",
+        "--cluster-column qa_assignment_id",
+        f"--training-history-file {training_history}",
+        "--aucs-plot-file ${TARGETS[0]}",
+        f"--out-extractions-file {extractions_pkl}",
+        f"--log-file {log_file}",
+        "--use-bertopic",
+        "--bertopic-nr-topics 100",
+        "--bertopic-top-k-phrases 3",
+        "--bertopic-init-file exp_cbm/prompts/baseline_init_bertopic.txt",
+        "--bertopic-iter-file exp_cbm/prompts/bayesian_iter_bertopic.txt",
+    ]
+    sources = [
+        c["extract_keyphrases"][0],  # pairs_with_keyphrases.csv
+        c["assemble_pairs"][1],      # indices.csv
+    ]
+    targets = [
+        path_join(outdir, "aucs.png"),
+    ]
+    env.Precious(training_history)
+    return env.Command(targets, sources, " ".join(cmd))
+
+
+@nest.add_target_with_env(localenv)
+def prepare_eval_data(env, outdir, c):
+    """
+    Keyphrase extraction only runs on the train partition, so test rows
+    have an empty `llm_output` that pandas reads as NaN. load_data_partition
+    drops NaN rows and would empty the test set, so fill in a placeholder.
+    """
+    cmd = [
+        "python exp_cbm/scripts/prepare_eval_data.py",
+        "--in-csv ${SOURCES[0]}",
+        "--out-csv ${TARGETS[0]}",
+    ]
+    sources = [
+        c["extract_keyphrases"][0],  # pairs_with_keyphrases.csv
+    ]
+    targets = [
+        path_join(outdir, "pairs_for_eval.csv"),
+    ]
+    return env.Command(targets, sources, " ".join(cmd))
+
+
+@nest.add_target_with_env(localenv)
+def evaluate_cbm(env, outdir, c):
+    """
+    Evaluate the trained CBM on the test partition. Reuses bc-llm's
+    evaluate_bayesian.py, which averages predictions across the trailing
+    posterior iterations and reports bootstrap-CI AUC/accuracy/Brier/ECE.
+    """
+    cache_db = path_join(f"exp_cbm/_output/cache_{c['seed']}.db")
+    training_history = path_join("exp_cbm/", outdir, "training_history.pkl")
+    test_extractions = path_join("exp_cbm/", outdir, "test_extractions.pkl")
+    num_posterior_iters = (
+        1 if c['max_n'] <= 200 else (MAX_EPOCHS + 1)
+    ) * c['num_meta_concepts']
+    cmd = [
+        f"PYTHONPATH={BC_LLM_DIR}",
+        f"python {BC_LLM_DIR}/scripts/evaluate_bayesian.py",
+        "--use-api",
+        f"--seed {c['seed']}",
+        f"--cache-file {cache_db}",
+        "--method-name bc_llm",
+        f"--num-posterior-iters {num_posterior_iters}",
+        "--in-dataset-file ${SOURCES[0]}",
+        "--indices-csv ${SOURCES[1]}",
+        f"--training-history-file {training_history}",
+        f"--out-extractions {test_extractions}",
+        "--prompt-concepts-file exp_cbm/prompts/concept_extraction.txt",
+        f"--llm-model-type {LLM_MODEL}",
+        f"--llm-iter-type {LLM_MODEL}",
+        f"--llm-extraction-type {LLM_MODEL}",
+        "--batch-size 100",
+        "--batch-concept-size 20",
+        "--batch-obs-size 1",
+        "--result-csv-file ${TARGETS[0]}",
+        "--calib-plot-file ${TARGETS[1]}",
+        "--log-file ${TARGETS[2]}",
+    ]
+    sources = [
+        c["prepare_eval_data"][0],   # pairs_for_eval.csv (llm_output NaN-free)
+        c["assemble_pairs"][1],      # indices.csv
+        c["fit_cbm"][0],             # dependency on training completion
+    ]
+    targets = [
+        path_join(outdir, "test_results.csv"),
+        path_join(outdir, "test_calibration.png"),
+        path_join(outdir, "test_eval.log"),
+    ]
+    return env.Command(targets, sources, " ".join(cmd))
+
+
+# @nest.add_target_with_env(localenv)
+# def export_concepts(env, outdir, c):
+#     """
+#     Dump the learned concepts and fitted linear-model coefficients from
+#     the trailing posterior iterations into a CSV for later inspection.
+#     """
+#     training_history = path_join("exp_cbm/", outdir, "training_history.pkl")
+#     num_posterior_iters = (
+#         1 if c['max_n'] <= 200 else MAX_EPOCHS
+#     ) * c['num_meta_concepts']
+#     cmd = [
+#         "python exp_cbm/scripts/export_concepts_csv.py",
+#         f"--training-history-file {training_history}",
+#         f"--num-posterior-iters {num_posterior_iters}",
+#         "--out-csv ${TARGETS[0]}",
+#         "--log-file ${TARGETS[1]}",
+#     ]
+#     sources = [
+#         c["fit_cbm"][0],  # dependency on training completion
+#     ]
+#     targets = [
+#         path_join(outdir, "concepts.csv"),
+#         path_join(outdir, "export_concepts.log"),
+#     ]
+#     return env.Command(targets, sources, " ".join(cmd))

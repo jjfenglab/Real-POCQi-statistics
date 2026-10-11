@@ -1,0 +1,36 @@
+You will be given a clinical question together with two candidate answers (Answer B vs Answer A). I will give you a series of comparative questions about these two answers. For each question, respond 1 of 3 values:
+*  1  = statement is true
+*  0  = the statement is not true and the opposite is not true (neutral)
+* -1  = opposite is true
+
+Treat the two answers symmetrically: do not favor whichever answer appears first.
+
+Questions:
+{prompt_questions}
+
+Clinical question and candidate answers:
+{sentence}
+
+Return a JSON of the following form:
+{
+    "extractions":
+    [
+        {
+            "question_id": 1,
+            "reasoning": "B is indeed more ... than A, so the statement is false",
+            "answer": 1
+        },
+        {
+            "question_id": 2,
+            "reasoning": "A is more ... than B, so the truth is the opposite",
+            "answer": -1
+        },
+        {
+            "question_id": 3,
+            "reasoning": "A and B are similar with respect to ...",
+            "answer": 0
+        }
+    ]
+}
+
+Answer all the questions. Return valid JSON only, with no additional commentary.

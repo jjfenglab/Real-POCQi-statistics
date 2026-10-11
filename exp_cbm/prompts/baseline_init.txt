@@ -1,0 +1,50 @@
+We are fitting a concept bottleneck model (CBM) that predicts which of two candidate answers to a clinical question an expert physician rater prefers. The outcome Y has two classes: Answer A wins (Y=0) or Answer B wins (Y=1). We want {num_meta_concepts} meta-concepts to extract from each (question, Answer A, Answer B) triple to maximize the accuracy of the CBM.
+
+Each meta-concept is a *comparative* yes/no question of the form "Does Answer B ___ more than Answer A?" — for example, "Does Answer B cite more recent evidence than Answer A?" or "Does Answer B give more specific recommendations than Answer A?". Each concept will later be scored on {-1, 0, 1}: 1 means the property is clearly more true of B than A, -1 means clearly more true of A than B, and 0 means equally true of both or neither.
+
+Below is a table of top words most associated with the outcome Y from a simple logistic regression on word counts over the packed (question + Answer A + Answer B) text.
+
+Top words:
+
+{top_features_df}
+
+Rules for good concepts:
+- Comparative between A and B (not a single-answer property).
+- Objective enough that two reviewers would answer similarly.
+- Avoid concepts whose answer is almost always "equally true of both" or almost always one-sided.
+- When listing matching words, just use the exact feature name that shows up in the dataframe, do not include the coefficient.
+
+Write your reasoning and candidate concepts as JSON:
+{
+    "reasoning": "<REASONING>",
+    "concepts":
+    [
+      {
+          "concept": "<CANDIDATE COMPARATIVE META CONCEPT>",
+          "words": <KEYPHRASES THAT MATCH OR ARE OPPOSITES OF THIS CONCEPT>
+      },
+      ...
+    ]
+}
+
+Example:
+{
+    "reasoning": "The top words suggest ...",
+    "concepts":
+    [
+      {
+          "concept": "Does Answer B provide more practical guidance than Answer A?",
+          "words": ["more practical: B > A", "less practical: A > B"]
+      },
+      {
+          "concept": "Does Answer B emphasize safety considerations more than Answer A?",
+          "words": ["more safety-aware: B > A", "fewer safety considerations: A > B"]
+      },
+      {
+          "concept": "Is Answer B shorter than Answer A?",
+          "words": ["longer: A > B", "shorter answer: B > A"]
+      }
+    ]
+}
+
+Ensure your answer contains {num_meta_concepts} concepts. Your answer:
