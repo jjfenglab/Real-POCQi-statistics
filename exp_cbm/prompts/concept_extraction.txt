@@ -1,7 +1,7 @@
 You will be given a clinical question together with two candidate answers (Answer A and Answer B). I will give you a series of comparative questions about these two answers. For each question, respond 1 of 3 values:
-*  1  = more true of Answer A than Answer B
-*  0  = equally true of both answers, or neither
-* -1  = more true of Answer B than Answer A
+*  1  = statement is true
+*  0  = the statement is not true and the opposite is not true (neutral)
+* -1  = opposite is true
 
 Treat the two answers symmetrically: do not favor whichever answer appears first.
 
@@ -17,12 +17,17 @@ Return a JSON of the following form:
     [
         {
             "question_id": 1,
-            "reasoning": "<ONE-SENTENCE RATIONALE>",
-            "answer": -1
+            "reasoning": "A is indeed more ... than B, so the statement is false",
+            "answer": 1
         },
         {
             "question_id": 2,
-            "reasoning": "<ONE-SENTENCE RATIONALE>",
+            "reasoning": "B is more ... than A, so the truth is the opposite",
+            "answer": -1
+        },
+        {
+            "question_id": 3,
+            "reasoning": "A and B are similar with respect to ...",
             "answer": 0
         }
     ]

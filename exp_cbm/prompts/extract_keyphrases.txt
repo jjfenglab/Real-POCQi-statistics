@@ -2,18 +2,51 @@ You will be shown a clinical question followed by two candidate answers (Answer 
 
 "{note}"
 
-Your job is to summarize the *differences* between Answer A and Answer B as a list of comparative keyphrases, which will be used by a bag-of-words model to find characteristics that lead to an expert clinician rater preferring a particular answer. The keyphrases must be **general enough to apply across unrelated clinical domains** (e.g., a phrase extracted from a dermatology question should still be meaningful for a cardiology or nephrology question). Hyper-specific phrases are useless to the model because they will not recur.
+Your job is to summarize the *differences* between Answer A and Answer B as a list of comparative keyphrases, which will be used by a bag-of-words model to find characteristics that lead to an expert clinician rater preferring a particular answer. The keyphrases must be **general enough to apply across unrelated clinical domains** — a phrase extracted from a dermatology question should still be meaningful for a cardiology, nephrology, oncology, neurology, or endocrinology question. If the phrase could only make sense inside one specialty, it is too specific. Hyper-specific phrases are useless to the model because they will not recur across domains.
 
 A keyphrase must be of the form "______: A > B" or "______: B > A".
 
-The blank must be a **general property of a clinical answer**, not a specific clinical entity. To help you brainstorm, here are the main axes of variation that distinguish clinical answers:
-- Content coverage: comprehensive, concise, breadth, depth
-- Audience: clinical, patient, academic, technical, lay
-- Evidence basis: guidelines, trials, evidence-based, mechanism-based, research-oriented vs. pragmatic
-- Clinical reasoning: mechanistic, differential reasoning, probabilistic reasoning, evidence-based reasoning
-- Recommendations: practical, more patient-specific, specific vs general, prescriptive vs tentative, assertive, nuanced, more caveats vs fewer caveats
-- Safety: more risk-aware, more side effects, more contraindications
-- Structure: longer vs shorter, more vs less concise, more or fewer tables, more or fewer lists
+The blank must be a **general property of a clinical answer**, not a specific clinical entity. To help you brainstorm, here are some axes of variation to consider for characterizing what factors influence clinician rating:
+
+**Content**
+- broader scope vs. narrower scope
+- comprehensive vs. succinct
+- on-topic focus vs. tangential expansion
+- population-specific vs. generic
+- meandering vs. direct
+
+**Evidence and sourcing**
+- cites primary literature vs. unsourced claims
+- quantitative evidence vs. qualitative evidence
+- references guidelines vs. no guidelines
+- cites recommendation strength vs. no evidence grading
+- mechanistic reasoning vs. descriptive only
+- acknowledges limitations vs. one-sided
+
+**Clinical reasoning and structure**
+- broad differential vs. narrow differential
+- ranked differential vs. unranked differential
+- case-contingent reasoning vs. generic reasoning
+- states contraindications vs. omits contraindications
+- quantitative thresholds vs. qualitative thresholds
+- risk-stratified by subgroup vs. undifferentiated risk
+- step-by-step reasoning vs no step-by-step reasoning
+
+**Recommendations and voice**
+- definitive recommendation vs. equivocal recommendation
+- clinician audience vs. patient audience
+- subspecialty-level vs. generalist-level
+- actionable guidance vs. conceptual guidance
+
+**Safety**
+- more risk-aware vs. less risk-aware
+- more adverse effects vs. fewer adverse effects
+- more drug interactions vs. fewer drug interactions
+
+**Structure and surface form**
+- longer response vs. shorter response
+- itemized lists vs. prose paragraphs
+- tabulated data vs. no tables
 
 Guidelines:
 - **The phrase before the colon must be 2-3 words.** Hard cap at 3 words.
@@ -23,14 +56,18 @@ Guidelines:
     - "more ECMO pharmacokinetics: B > A" → "more pharmacologic detail: B > A"
     - "more emphasis on lesion morphology: A > B" → "more exam detail: A > B" (or drop)
     - "more emphasis on lesion color: A > B" → drop (too specific; no good abstraction)
-    - "includes NCCN guidelines: B > A" → "more guideline references: B > A"
+    - "includes NCCN guidelines: B > A" → "more named guidelines: B > A"
     - "more biopsy mention: A > B" → "more diagnostic workup: A > B"
+    - "cites King 2018: A > B" → "more named studies: A > B"
+    - "mentions 97th percentile: B > A" → "more numeric thresholds: B > A"
 - For each keyphrase, also list some synonyms and generalizations. **Synonyms must be alternate wordings of the same general concept, not a list of specific sub-aspects.**
     - GOOD synonym bundle (same concept, different wordings): "more diagnostic detail: A > B, more workup detail: A > B, more investigation detail: A > B"
     - BAD synonym bundle (sibling specifics masquerading as synonyms): "more emphasis on lesion color: A > B, more emphasis on lesion texture: A > B, more emphasis on lesion morphology: A > B"
 - Synonyms also include switching the comparison sign between A > B and B > A, e.g., "more clinical details: A > B" and "fewer clinical details: B > A"
 - Keyphrases, synonyms, and generalizations can be comma-separated or listed as separate strings
 - If a property is present in both answers to a similar degree, do not include it (it is not a difference).
+- **Always include length as one axis when it differs**, but do not let it dominate: if one answer is longer, still identify at least 5–10 non-length axes that distinguish them. Describe *what fills the extra space* (more caveats? more numbers? more differential? more lifestyle context?) in addition to noting length.
+- **Cross-domain test:** before finalizing each keyphrase, ask yourself whether the same phrase would be interpretable and potentially predictive if the question were about an unrelated specialty (cardiology, neurology, nephrology, oncology, endocrinology, dermatology, OB/GYN, etc.). If the phrase relies on domain-specific vocabulary, abstract it up or drop it.
 - Only focus on properties of the single-round QA, ignore follow-up offers.
 - Return up to 30 entries.
 
@@ -46,15 +83,27 @@ Output JSON in the following format:
 
 Example:
 {
-    "reasoning": "The answers differ primarily in evidence citations and dosing specificity.",
+    "reasoning": "...",
     "keyphrases": [
-        "more recent guidelines: A > B, less recent guidelines: B > A",
-        "more specific dosing: A > B, less dosing information: B > A",
-        "more side effect information: A > B, less side effect information: B > A",
-        "more clinical details: A > B",
-        "more medication details: A > B",
-        "more management instructions: A > B",
-        "more for patient audience: B > A, more for clinical audience: A > B",
+        "cites primary literature: B > A, unsourced claims: A > B",
+        "cites named case series: B > A",
+        "quantitative evidence: B > A, qualitative evidence: A > B",
+        "cites society guidelines: B > A, unattributed guidelines: A > B",
+        "cites recommendation strength: B > A, no evidence grading: A > B",
+        "quantitative thresholds: B > A, qualitative thresholds: A > B",
+        "mechanistic reasoning: A > B, descriptive only: B > A",
+        "molecular-level specificity: A > B",
+        "case-contingent reasoning: B > A, generic reasoning: A > B",
+        "ranked differential: A > B, unranked differential: B > A",
+        "justifies drug choice: B > A, unjustified drug choice: A > B",
+        "impression up front: A > B, impression at end: B > A",
+        "actionable guidance: A > B, conceptual guidance: B > A",
+        "definitive recommendation: A > B, equivocal recommendation: B > A",
+        "more adverse effects: B > A, fewer adverse effects: A > B",
+        "more drug interactions: B > A, fewer drug interactions: A > B",
+        "risk-stratified by subgroup: B > A, undifferentiated risk: A > B",
+        "specified monitoring interval: B > A, unspecified monitoring interval: A > B",
+        "on-topic focus: B > A, tangential expansion: A > B",
         "longer answer: B > A, shorter answer: A > B"
     ]
 }

@@ -1,4 +1,4 @@
-We are fitting a concept bottleneck model (CBM) that predicts which of two candidate answers to a clinical question an expert physician rater prefers. The outcome Y has three classes: Answer A wins, tie, or Answer B wins. We want {num_concepts} meta-concepts to extract from each (question, Answer A, Answer B) triple to maximize the accuracy of the CBM.
+We are fitting a concept bottleneck model (CBM) that predicts which of two candidate answers to a clinical question an expert physician rater prefers. The outcome Y has two classes: Answer A wins (Y=0) or Answer B wins (Y=1). We want {num_concepts} meta-concepts to extract from each (question, Answer A, Answer B) triple to maximize the accuracy of the CBM.
 
 Each meta-concept is a *comparative* yes/no question of the form "Does Answer A ___ more than Answer B?" — for example, "Does Answer A cite more recent evidence than Answer B?" or "Does Answer A give more specific recommendations than Answer B?". Each concept will later be scored on {-1, 0, 1}: 1 means the property is clearly more true of A than B, -1 means clearly more true of B than A, and 0 means equally true of both or neither.
 
@@ -19,6 +19,7 @@ Rules for good concepts:
 - Avoid concepts whose answer is almost always "equally true of both" or almost always one-sided.
 - Do not propose unions of two concepts ("Does A cite more recent guidelines or give more specific dosing than B?" is not allowed).
 - Do not propose concepts you would expect to agree >95% of the time with any of the existing {num_concepts_fixed} meta-concepts.
+- When listing matching words, just use the exact feature name that shows up in the dataframe, do not include the coefficient.
 
 Write your reasoning and candidate concepts as JSON. Merge candidates that are essentially the same (>95% agreement) or essentially opposites (>95% disagreement):
 
@@ -40,8 +41,16 @@ Example:
     "concepts":
     [
       {
-          "concept": "Does Answer A more clearly flag contraindications than Answer B?",
-          "words": "more contraindications flagged: A > B, fewer cautions: B > A"
+          "concept": "Does Answer A provide more practical guidance than Answer B?",
+          "words": "more practical: A > B, less practical: B > A"
+      },
+      {
+          "concept": "Does Answer A emphasize safety considerations more than Answer B?",
+          "words": "more safety-aware: A > B, fewer safety considerations: B > A"
+      },
+      {
+          "concept": "Is Answer A shorter than Answer B?",
+          "words": "longer: B > A, shorter answer: A > B"
       }
     ]
 }
