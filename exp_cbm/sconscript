@@ -34,6 +34,18 @@ BATCH_SIZE = 20
 MAX_EPOCHS = 0
 NUM_GREEDY_EPOCHS = 0
 
+# Matches the one-hot columns produced by src/assemble_cbm_pairs.py
+PROVIDERS = [
+    "claude-opus-4-8",
+    "gemini-3.1-pro",
+    "gpt-5.5",
+    "openevidence",
+]
+PROVIDER_ONEHOT_COLS = (
+    [f"provider_a_{p}" for p in PROVIDERS]
+    + [f"provider_b_{p}" for p in PROVIDERS]
+)
+
 VARIANTS = [
     "text_only",
 ]
@@ -69,7 +81,6 @@ def assemble_pairs(env, outdir, c):
         f"--axis {c['axis']}",
         f"--max-n {c['max_n']}",
         f"--seed {c['seed']}",
-        # "--no-augment",
         "--test-frac 0.2",
         "--drop-ties",
         "--out-csv ${TARGETS[0]}",
@@ -77,9 +88,9 @@ def assemble_pairs(env, outdir, c):
         "--log ${TARGETS[2]}",
     ]
     targets = [
-        path_join(outdir, "pairs.csv"),
-        path_join(outdir, "indices.csv"),
-        path_join(outdir, "assemble.log"),
+        path_join(outdir, "pairs_w_identity.csv"),
+        path_join(outdir, "indices_w_identity.csv"),
+        path_join(outdir, "assemble_w_identity.log"),
     ]
     return env.Command(targets, [], " ".join(cmd))
 
@@ -147,6 +158,11 @@ def extract_keyphrases(env, outdir, c):
     ]
     return env.Command(targets, sources, " ".join(cmd))
 
+nest.add("provider_identity_known", [
+    # None,
+    True,
+], label_func=lambda v: "" if v is None else f"provider_identity_known_{v}")
+
 nest.add("num_meta_concepts", [
     5,
 ])
@@ -190,6 +206,8 @@ def fit_cbm(env, outdir, c):
         "--bertopic-init-file exp_cbm/prompts/baseline_init_bertopic.txt",
         "--bertopic-iter-file exp_cbm/prompts/bayesian_iter_bertopic.txt",
     ]
+    if c["provider_identity_known"]:
+        cmd.append("--keep-x-cols " + " ".join(PROVIDER_ONEHOT_COLS))
     sources = [
         c["extract_keyphrases"][0],  # pairs_with_keyphrases.csv
         c["assemble_pairs"][1],      # indices.csv

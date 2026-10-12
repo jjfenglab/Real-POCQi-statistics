@@ -168,6 +168,35 @@ def join_rating_context(
     return df
 
 
+def provider_onehot_columns(providers: list[str]) -> tuple[list[str], list[str]]:
+    """Return the (slot_a, slot_b) one-hot column names in a fixed order."""
+    cols_a = [f"provider_a_{p}" for p in providers]
+    cols_b = [f"provider_b_{p}" for p in providers]
+    return cols_a, cols_b
+
+
+def add_provider_onehots(
+    df: pd.DataFrame, providers: list[str]
+) -> pd.DataFrame:
+    """Append slot-A and slot-B provider one-hots using a fixed provider list
+    so train and test see the same columns even if a provider is absent from
+    one split."""
+    cols_a, cols_b = provider_onehot_columns(providers)
+    oh_a = (
+        pd.get_dummies(df["slot_a_provider"], prefix="provider_a", prefix_sep="_")
+        .reindex(columns=cols_a, fill_value=0)
+        .astype(int)
+    )
+    oh_b = (
+        pd.get_dummies(df["slot_b_provider"], prefix="provider_b", prefix_sep="_")
+        .reindex(columns=cols_b, fill_value=0)
+        .astype(int)
+    )
+    oh_a.index = df.index
+    oh_b.index = df.index
+    return pd.concat([df, oh_a, oh_b], axis=1)
+
+
 def apply_drop_ties(df: pd.DataFrame) -> pd.DataFrame:
     before = len(df)
     df = df[df["y"] != 1].copy()
@@ -193,8 +222,9 @@ def pack_sentence(q: str, a: str, b: str) -> str:
     )
 
 
-def build_original_rows(df: pd.DataFrame) -> pd.DataFrame:
-    return pd.DataFrame({
+def build_original_rows(df: pd.DataFrame, providers: list[str]) -> pd.DataFrame:
+    cols_a, cols_b = provider_onehot_columns(providers)
+    out = pd.DataFrame({
         "qa_assignment_id": df["qa_assignment_id"].values,
         "question_id": df["question_id"].values,
         "rater_id": df["rater_id"].values,
@@ -207,11 +237,17 @@ def build_original_rows(df: pd.DataFrame) -> pd.DataFrame:
         "is_augmented": False,
         "partition": df["partition"].values,
     })
+    for c in cols_a + cols_b:
+        out[c] = df[c].values
+    return out
 
 
-def build_swapped_rows(df: pd.DataFrame, drop_ties: bool) -> pd.DataFrame:
+def build_swapped_rows(
+    df: pd.DataFrame, drop_ties: bool, providers: list[str]
+) -> pd.DataFrame:
     label_flip = LABEL_FLIP_BINARY if drop_ties else LABEL_FLIP
-    return pd.DataFrame({
+    cols_a, cols_b = provider_onehot_columns(providers)
+    out = pd.DataFrame({
         "qa_assignment_id": df["qa_assignment_id"].values,
         "question_id": df["question_id"].values,
         "rater_id": df["rater_id"].values,
@@ -224,6 +260,11 @@ def build_swapped_rows(df: pd.DataFrame, drop_ties: bool) -> pd.DataFrame:
         "is_augmented": True,
         "partition": df["partition"].values,
     })
+    # Augmented sibling has A and B exchanged, so the provider one-hots flip too.
+    for ca, cb in zip(cols_a, cols_b):
+        out[ca] = df[cb].values
+        out[cb] = df[ca].values
+    return out
 
 
 def log_inter_rater_agreement(df: pd.DataFrame) -> None:
@@ -338,6 +379,15 @@ def main():
         mapping_dict=CHOICE_TO_LABEL_EXTREMES if args.only_extremes else CHOICE_TO_LABEL)
     df = join_rating_context(axis_ratings, eligible_assignments, questions, answers_by_key)
 
+    # Fix the provider list over the full eligible pool so train and test
+    # share one-hot columns even if a provider is absent from one split.
+    providers = sorted(
+        set(eligible_assignments["slot_a_provider"].dropna().unique())
+        | set(eligible_assignments["slot_b_provider"].dropna().unique())
+    )
+    logging.info("providers for one-hot encoding (%d): %s", len(providers), providers)
+    df = add_provider_onehots(df, providers)
+
     df["partition"] = np.where(df["qa_assignment_id"].isin(test_clusters), "test", "train")
     logging.info("pre-subsample train/test split: %s",
                  df["partition"].value_counts().to_dict())
@@ -345,12 +395,14 @@ def main():
     if args.drop_ties:
         df = apply_drop_ties(df)
 
+    # Limit to the max_n rows
     df = subsample(df, args.max_n, args.seed)
     df["rater_id"] = df["user_id"]
 
-    original = build_original_rows(df)
+    # Augment the dataset if requested by flipping provider positions and flipping ratings
+    original = build_original_rows(df, providers)
     if args.augment:
-        swapped = build_swapped_rows(df, args.drop_ties)
+        swapped = build_swapped_rows(df, args.drop_ties, providers)
         out = pd.concat([original, swapped], ignore_index=True)
     else:
         swapped = original.iloc[0:0]
@@ -360,6 +412,9 @@ def main():
     logging.info("final pairs: %d rows (%d originals + %d augmented)",
                  len(out), len(original), len(swapped))
     logging.info("label distribution: %s", out["y"].value_counts().to_dict())
+    cols_a, cols_b = provider_onehot_columns(providers)
+    logging.info("provider one-hot prevalence: %s",
+                 out[cols_a + cols_b].mean().round(3).to_dict())
 
     log_inter_rater_agreement(df)
 
