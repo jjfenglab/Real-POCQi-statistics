@@ -542,3 +542,266 @@ ggsave(
 )
 ```
 
+# Win Rate Change vs Clinician Raters
+
+For each LLM judge (and jury), show the absolute percent-point change in win rate
+relative to human clinician raters, broken down by vendor and axis.
+
+```{r delta_ci_bootstrap}
+# Bootstrap the delta (judge favorability - human favorability) jointly over
+# question clusters so the paired structure is preserved.
+#
+# human_df  : data.frame with columns question_id, outcome  (human outcomes)
+# judge_df  : data.frame with columns question_id, outcome  (judge outcomes for one grader)
+# vendor    : the vendor whose one-vs-rest outcomes to compare
+# n_boot    : number of bootstrap replicates
+# ci_level  : e.g. 0.95
+bootstrap_delta_ci <- function(human_df, judge_df, vendor,
+                                n_boot = 1000, ci_level = 0.95,
+                                bootstrap_by = "question") {
+  cluster_col <- if (bootstrap_by == "question") "question_id" else "user_id"
+
+  h_ovr <- prepare_one_vs_rest_df(human_df, vendor) %>%
+    rename(outcome_human = outcome)
+  j_ovr <- prepare_one_vs_rest_df(judge_df, vendor) %>%
+    rename(outcome_judge = outcome)
+
+  paired <- inner_join(h_ovr, j_ovr, by = "question_id")
+  if (nrow(paired) == 0) return(list(delta = NA_real_, ci_lower = NA_real_, ci_upper = NA_real_))
+
+  obs_delta <- get_favorability_score(paired$outcome_judge) -
+               get_favorability_score(paired$outcome_human)
+
+  splits_h <- split(paired$outcome_human, paired[[cluster_col]])
+  splits_j <- split(paired$outcome_judge, paired[[cluster_col]])
+  n_clusters <- length(splits_h)
+
+  boot_deltas <- replicate(n_boot, {
+    idx <- sample.int(n_clusters, n_clusters, replace = TRUE)
+    fav_j <- get_favorability_score(unlist(splits_j[idx], use.names = FALSE))
+    fav_h <- get_favorability_score(unlist(splits_h[idx], use.names = FALSE))
+    fav_j - fav_h
+  })
+
+  alpha <- 1 - ci_level
+  ci <- quantile(boot_deltas, c(alpha / 2, 1 - alpha / 2), names = FALSE)
+  list(delta = obs_delta, ci_lower = ci[1], ci_upper = ci[2])
+}
+```
+
+```{r delta_ci_compute}
+# Build paired raw data: human and each judge share the same question pool.
+# human_text_only has columns: question_id, slot_a_vendor, slot_b_vendor,
+#   winner, loser, is_tie, axis (among others).
+# machine_text_only has the same columns plus grader.
+
+delta_ci_rows <- list()
+for (g in unique(machine_text_only$grader)) {
+  judge_df_full <- machine_text_only %>% filter(grader == g)
+  for (ax in axes) {
+    human_ax  <- human_text_only %>% filter(axis == ax)
+    judge_ax  <- judge_df_full    %>% filter(axis == ax)
+    vendors_ax <- sort(unique(c(human_ax$slot_a_vendor, human_ax$slot_b_vendor)))
+    for (v in vendors_ax) {
+      res <- bootstrap_delta_ci(
+        human_ax, judge_ax, v,
+        n_boot        = params$n_boot,
+        ci_level      = 0.95,
+        bootstrap_by  = params$bootstrap_by
+      )
+      delta_ci_rows[[length(delta_ci_rows) + 1]] <- tibble(
+        judge  = g,
+        axis   = ax,
+        vendor = v,
+        delta  = res$delta,
+        ci_lower_delta = res$ci_lower,
+        ci_upper_delta = res$ci_upper
+      )
+    }
+  }
+}
+
+# Also compute for the jury
+for (ax in axes) {
+  human_ax <- human_text_only %>% filter(axis == ax)
+  jury_ax  <- jury_ratings      %>% filter(axis == ax)
+  vendors_ax <- sort(unique(c(human_ax$slot_a_vendor, human_ax$slot_b_vendor)))
+  for (v in vendors_ax) {
+    res <- bootstrap_delta_ci(
+      human_ax, jury_ax, v,
+      n_boot       = params$n_boot,
+      ci_level     = 0.95,
+      bootstrap_by = params$bootstrap_by
+    )
+    delta_ci_rows[[length(delta_ci_rows) + 1]] <- tibble(
+      judge  = "jury",
+      axis   = ax,
+      vendor = v,
+      delta  = res$delta,
+      ci_lower_delta = res$ci_lower,
+      ci_upper_delta = res$ci_upper
+    )
+  }
+}
+
+delta_ci_df <- bind_rows(delta_ci_rows)
+```
+
+```{r winrate_delta_plot, fig.width=12, fig.height=14}
+# Compute delta: judge win rate minus human win rate (in percentage points).
+# Join bootstrapped CIs from delta_ci_df (computed above).
+human_fav <- all_favorability %>%
+  filter(judge == "human") %>%
+  select(axis, vendor, human_fav = favorability)
+
+delta_data <- all_favorability %>%
+  filter(judge != "human") %>%
+  left_join(human_fav, by = c("axis", "vendor")) %>%
+  left_join(delta_ci_df, by = c("judge", "axis", "vendor")) %>%
+  mutate(
+    delta_pct    = 100 * (favorability - human_fav),
+    ci_lo_pct    = 100 * ci_lower_delta,
+    ci_hi_pct    = 100 * ci_upper_delta,
+    judge_label  = case_when(
+      judge == "jury" ~ "Jury",
+      TRUE ~ grader_display_names[judge]
+    ),
+    axis_label   = axis_labels[axis],
+    vendor_label = vendor_display_names[vendor]
+  ) %>%
+  filter(!is.na(judge_label)) %>%
+  mutate(
+    judge_label  = factor(judge_label, levels = c(
+      grader_display_order[grader_display_order != "Expert"], "Jury"
+    )),
+    axis_label   = factor(axis_label,   levels = axis_labels),
+    vendor_label = factor(vendor_label, levels = gradee_display_order)
+  )
+
+# One panel per judge (rows), bars grouped by axis, colored by vendor
+delta_plot <- ggplot(delta_data,
+                     aes(x = axis_label, y = delta_pct, fill = vendor_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.65) +
+  geom_errorbar(
+    aes(ymin = ci_lo_pct, ymax = ci_hi_pct),
+    position = position_dodge(width = 0.75),
+    width = 0.25, linewidth = 0.5, color = "grey20"
+  ) +
+  geom_hline(yintercept = 0, linewidth = 0.4, color = "grey30") +
+  facet_wrap(~ judge_label, ncol = 1, strip.position = "right") +
+  scale_fill_brewer(palette = "Set2", name = "Vendor") +
+  scale_y_continuous(
+    labels = function(x) paste0(ifelse(x > 0, "+", ""), x, "%")
+  ) +
+  labs(
+    title    = NULL,
+    x        = NULL,
+    y        = "Difference in Win Difference (pp)"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    strip.text.y       = element_text(angle = 0, hjust = 0, face = "bold", size = 11),
+    axis.text.x        = element_text(angle = 20, hjust = 1, size = 10),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    legend.position    = "bottom",
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(size = 10, color = "grey40")
+  )
+
+print(delta_plot)
+```
+
+# Win Rate Change Heatmap vs Clinician Raters
+
+Same layout as above, using tile color (red–white–blue) and text labels instead of bar
+height.  Uses the bootstrapped `delta_ci_df` computed above.
+
+```{r winrate_delta_heatmap, fig.width=12.5, fig.height=4}
+# 5-column × 4-row grid: facet columns = preference axes, x = vendor, y = judge.
+delta_heatmap_data <- delta_ci_df %>%
+  mutate(
+    delta_pct    = 100 * delta,
+    ci_lo_pct    = 100 * ci_lower_delta,
+    ci_hi_pct    = 100 * ci_upper_delta,
+    label_main   = sprintf("%+.0f%%", delta_pct),
+    label_ci     = case_when(
+      !is.na(ci_lo_pct) ~ sprintf("[%+.0f, %+.0f]", ci_lo_pct, ci_hi_pct),
+      TRUE ~ ""
+    ),
+    judge_label  = case_when(
+      judge == "jury" ~ "Combined Jury",
+      TRUE ~ paste0("Judge: ", grader_display_names[judge])
+    ),
+    axis_label   = factor(axis_labels[axis],            levels = axis_labels),
+    vendor_label = factor(vendor_display_names[vendor], levels = gradee_display_order)
+  ) %>%
+  filter(!is.na(judge_label)) %>%
+  mutate(
+    judge_label = factor(judge_label, levels = c(
+      paste0("Judge: ", grader_display_order[grader_display_order != "Expert"]), "Combined Jury"
+    ))
+  )
+
+delta_heatmap_plot <- ggplot(
+    delta_heatmap_data,
+    aes(x = vendor_label, y = axis_label, fill = delta_pct)
+  ) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  geom_text(aes(
+      label = label_main,
+      color = if_else(abs(delta_pct) > 35, "white", "black"),
+      fontface = "bold"
+    ),
+            size = 3.2, nudge_y = 0.13) +
+  geom_text(aes(
+      label = label_ci,
+      color = if_else(abs(delta_pct) > 35, "grey80", "grey20"),
+    ),
+            size = 2.4, nudge_y = -0.15) +
+  facet_grid(~ judge_label) +
+  scale_color_identity() + 
+  scale_fill_distiller(
+    palette = "PuOr",
+    direction = 1,
+    name     = "Difference in\nWin Difference (pp)",
+    breaks   = c(-50, -25, 0, 25, 50),
+    limits   = c(-50, 50),
+    oob      = scales::squish
+  ) +
+  scale_x_discrete(position = "bottom") +
+  scale_y_discrete(limits = rev(levels(delta_heatmap_data$axis_label))) +
+  labs(
+    title    = NULL,
+    x        = "Response Model",
+    y        = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    strip.text.x      = element_text(face = "bold", size = 11),
+    axis.text.x       = element_text(size = 10),
+    axis.text.y       = element_text(size = 10, face = "bold"),
+    axis.title.x = element_text(size = 11, margin = margin(t = 12)),
+    panel.grid        = element_blank(),
+    panel.spacing     = unit(0.4, "cm"),
+    legend.position   = "right",
+    legend.key.height = unit(1.2, "cm"),
+    legend.key.width  = unit(0.4, "cm"),
+    plot.title        = element_text(face = "bold", size = 13),
+    plot.subtitle     = element_text(size = 10, color = "grey40")
+  )
+
+print(delta_heatmap_plot)
+```
+
+```{r save_delta_heatmap}
+ggsave(
+  file.path(output_dir, paste0(params$output_name, "_winrate_delta_heatmap.pdf")),
+  delta_heatmap_plot, width = 14, height = 5
+)
+ggsave(
+  file.path(output_dir, paste0(params$output_name, "_winrate_delta_heatmap.png")),
+  delta_heatmap_plot, width = 14, height = 5, dpi = 300
+)
+```
+
