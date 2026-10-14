@@ -50,11 +50,11 @@ VARIANTS = [
     "text_only",
 ]
 AXES = [
-    "clinical_utility",
     "accuracy",
+    "clinical_utility",
     "authoritativeness",
-    "verifiability",
     "completeness",
+    "verifiability",
 ]
 SEEDS = [0]
 LLM_MODEL = "anthropic/claude-haiku-5-5"
@@ -63,6 +63,12 @@ LLM_MODEL = "anthropic/claude-haiku-5-5"
 nest = SConsWrap(Nest(), localenv["output"], alias_environment=localenv)
 
 nest.add("variant", VARIANTS)
+
+# Aggregate across axes: each per-axis vis_posterior_d3 target appends its
+# (axis_name, training_history_pkl) tuple into this list so the post-pop
+# aggregator can build a single 2x3 figure.
+nest.add_aggregate("axis_panels", list)
+
 nest.add("axis", AXES)
 nest.add("max_n", [
     # 100,  # control max sample size for testing
@@ -159,8 +165,8 @@ def extract_keyphrases(env, outdir, c):
     return env.Command(targets, sources, " ".join(cmd))
 
 nest.add("provider_identity_known", [
-    # None,
-    True,
+    None,
+    # True,
 ], label_func=lambda v: "" if v is None else f"provider_identity_known_{v}")
 
 nest.add("num_meta_concepts", [
@@ -191,7 +197,7 @@ def fit_cbm(env, outdir, c):
         "--batch-obs-size 1",
         "--learner-type count_l2",
         "--inverse-penalty-param 20000",
-        "--train-frac 0.75",
+        # "--train-frac 0.75",
         "--baseline-init-file exp_cbm/prompts/baseline_init.txt",
         "--prompt-concepts-file exp_cbm/prompts/concept_extraction.txt",
         "--prompt-iter-file exp_cbm/prompts/bayesian_iter.txt",
@@ -271,18 +277,112 @@ def evaluate_cbm(env, outdir, c):
         "--batch-size 100",
         "--batch-concept-size 20",
         "--batch-obs-size 1",
+        "--cluster-column qa_assignment_id",
         "--result-csv-file ${TARGETS[0]}",
         "--calib-plot-file ${TARGETS[1]}",
         "--log-file ${TARGETS[2]}",
     ]
+    if c["provider_identity_known"]:
+        cmd += ["--drop-cols provider_a_openevidence provider_b_openevidence",]
     sources = [
         c["prepare_eval_data"][0],   # pairs_for_eval.csv (llm_output NaN-free)
         c["assemble_pairs"][1],      # indices.csv
         c["fit_cbm"][0],             # dependency on training completion
     ]
     targets = [
-        path_join(outdir, "test_results.csv"),
-        path_join(outdir, "test_calibration.png"),
-        path_join(outdir, "test_eval.log"),
+        path_join(outdir, "test_results_frac75.csv"),
+        path_join(outdir, "test_calibration_frac75.png"),
+        path_join(outdir, "test_eval_frac75.log"),
+    ]
+    return env.Command(targets, sources, " ".join(cmd))
+
+
+@nest.add_target_with_env(localenv)
+def vis_posterior_d3(env, outdir, c):
+    """
+    Render an interactive D3 HTML visualization of the trained CBM's
+    posterior concepts: one draggable label + colored dot per unique
+    concept, PCA-laid-out, colored by posterior mean coef.
+    """
+    training_history = path_join("exp_cbm/", outdir, "training_history_frac75.pkl")
+    coef_offset = (
+        len(PROVIDER_ONEHOT_COLS) if c["provider_identity_known"] else 0
+    )
+    cmd = [
+        f"PYTHONPATH={BC_LLM_DIR}",
+        "python exp_cbm/scripts/vis_posterior_d3.py",
+        f"--training-history-file {training_history}",
+        f"--axis-name {c['axis']}",
+        "--num-posterior-iters 100",
+        f"--provider-identity-coef-offset {coef_offset}",
+        "--explored-threshold 0.05",
+        "--k-min 2",
+        "--k-max 10",
+        "--default-k 4",
+        # Agglomerative (full-embedding clustering + per-cluster KDE):
+        # "--cluster-method agglomerative",
+        # GMM (joint 2D mixture in PC space + closed-form HPD ellipses):
+        "--cluster-method gmm",
+        "--gmm-eps-jitter 0.02",
+        f"--seed {c['seed']}",
+        "--out-html ${TARGETS[0]}",
+        "--out-image ${TARGETS[1]}",
+    ]
+    sources = [
+        c["fit_cbm"][0],  # dependency on training completion
+    ]
+    targets = [
+        path_join(outdir, "posterior_concepts.html"),
+        path_join(outdir, "posterior_concepts.svg"),
+    ]
+    result = env.Command(targets, sources, " ".join(cmd))
+    # Record this axis's inputs so the post-pop aggregator can rebuild the
+    # same panel directly (no SVG stitching needed).
+    c["axis_panels"].append({
+        "axis": c["axis"],
+        "training_history": training_history,
+        "coef_offset": coef_offset,
+        "svg": result[1],
+    })
+    return result
+
+nest.pop('axis')
+
+
+@nest.add_target_with_env(localenv)
+def aggregate_posterior_panels(env, outdir, c):
+    """
+    Compose the five per-axis posterior panels into a single 2x3 figure
+    (five axes + one legend cell). Re-renders each panel in matplotlib so
+    fonts stay native and every panel honors its own saved_positions JSON.
+    """
+    panels = c["axis_panels"]
+    # One per-axis provider_identity_coef_offset is enough; it's shared
+    # across axes within a given provider_identity_known branch.
+    coef_offset = panels[0]["coef_offset"]
+    th_args = []
+    axis_args = []
+    for pnl in panels:
+        th_args.append(f"--training-history-file {pnl['training_history']}")
+        axis_args.append(f"--axis-name {pnl['axis']}")
+    cmd = [
+        f"PYTHONPATH={BC_LLM_DIR}",
+        "python exp_cbm/scripts/aggregate_posterior_panels.py",
+        *th_args,
+        *axis_args,
+        "--num-posterior-iters 100",
+        f"--provider-identity-coef-offset {coef_offset}",
+        "--explored-threshold 0.05",
+        "--k-min 2",
+        "--k-max 10",
+        "--default-k 4",
+        "--cluster-method gmm",
+        "--gmm-eps-jitter 0.02",
+        f"--seed 0",
+        "--out-figure ${TARGETS[0]}",
+    ]
+    sources = [pnl["svg"] for pnl in panels]
+    targets = [
+        path_join(outdir, "posterior_concepts_grid.pdf"),
     ]
     return env.Command(targets, sources, " ".join(cmd))
