@@ -694,9 +694,9 @@ delta_plot <- ggplot(delta_data,
     labels = function(x) paste0(ifelse(x > 0, "+", ""), x, "%")
   ) +
   labs(
-    title    = "Difference in Win Rates, LLM Judges vs. Clinician Raters",
+    title    = NULL,
     x        = NULL,
-    y        = "Win rate change (pp)"
+    y        = "Difference in Win Difference (pp)"
   ) +
   theme_minimal(base_size = 11) +
   theme(
@@ -764,7 +764,7 @@ delta_heatmap_plot <- ggplot(
   scale_fill_distiller(
     palette = "PuOr",
     direction = 1,
-    name     = "Win Rate\nDifference (pp)",
+    name     = "Difference in\nWin Difference (pp)",
     breaks   = c(-50, -25, 0, 25, 50),
     limits   = c(-50, 50),
     oob      = scales::squish
@@ -772,7 +772,7 @@ delta_heatmap_plot <- ggplot(
   scale_x_discrete(position = "bottom") +
   scale_y_discrete(limits = rev(levels(delta_heatmap_data$axis_label))) +
   labs(
-    title    = "Difference in Win Rates, LLM Judges vs. Clinician Raters",
+    title    = NULL,
     x        = "Response Model",
     y        = NULL
   ) +
