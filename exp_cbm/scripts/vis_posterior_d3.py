@@ -1620,9 +1620,24 @@ def _cluster_name(cid: int) -> str:
 _DOT_COLOR = "#1f3b60"
 _EXPLORED_COLOR = "#9a9a9a"
 _UNIFORM_DOT_R = 4  # svg px
-_HPD_FILLS = {0.95: "#dde7f1", 0.80: "#b4ccea", 0.50: "#7fa6d4"}
-_HPD_ALPHAS = {0.95: 0.55, 0.80: 0.65, 0.50: 0.75}
+_HPD_FILLS = {0.95: "#e8e8e8", 0.80: "#c8c8c8", 0.50: "#a0a0a0"}
+_HPD_ALPHAS = {0.95: 0.60, 0.80: 0.70, 0.50: 0.80}
 _LEVEL_ORDER = (0.95, 0.80, 0.50)
+
+
+def _darken_hex(hex_color: str, factor: float) -> str:
+    """Mix `hex_color` with black by `factor` ∈ [0, 1]: 0 = original, 1 = black.
+
+    Used to derive a legible on-white text color from the same base used for
+    HPD fills, so the colored label visually belongs to its colored region.
+    """
+    c = hex_color.lstrip("#")
+    r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+    f = max(0.0, min(1.0, float(factor)))
+    r = int(round(r * (1 - f)))
+    g = int(round(g * (1 - f)))
+    b = int(round(b * (1 - f)))
+    return f"#{r:02x}{g:02x}{b:02x}"
 _OVAL_FILL = "#4a6b8a"
 _CLUSTER_TEXT = "#142239"
 _AXIS_COLOR = "#808080"
@@ -2189,8 +2204,8 @@ def _resolve_ovals(payload: dict) -> list:
     return out
 
 
-_CLUSTER_FONT_MIN = 16.0  # smallest cluster-label font (at |coef|=0)
-_CLUSTER_FONT_MAX = 34.0  # largest cluster-label font (at |coef|>=ref)
+_CLUSTER_FONT_MIN = 22.0  # smallest cluster-label font (at |coef|=0)
+_CLUSTER_FONT_MAX = 44.0  # largest cluster-label font (at |coef|>=ref)
 
 
 def _cluster_label_fontsize(coef_abs: float, coef_abs_ref: float) -> float:
@@ -2215,7 +2230,8 @@ def render_payload_to_ax(ax,
                          show_title: bool = True,
                          show_axes_labels: bool = True,
                          font_scale: float = 1.0,
-                         coef_abs_ref: float | None = None) -> None:
+                         coef_abs_ref: float | None = None,
+                         label_color_map: dict | None = None) -> None:
     """Render a static version of the posterior panel into an existing Axes.
 
     Mirrors the D3 template's geometry (1400x900 inner-box pixel space) so
@@ -2257,40 +2273,19 @@ def render_payload_to_ax(ax,
             [y_offset, y_offset + eff_h],
             color=_AXIS_COLOR, linewidth=0.75, zorder=1)
 
-    def _ticks(lo, hi, n=5):
-        import matplotlib.ticker as mtick
-        loc = mtick.MaxNLocator(nbins=n)
-        return loc.tick_values(lo, hi)
-
-    xt_pc = _ticks(payload["xlim"][0], payload["xlim"][1])
-    yt_pc = _ticks(payload["ylim"][0], payload["ylim"][1])
-    for v in xt_pc:
-        if payload["xlim"][0] <= v <= payload["xlim"][1]:
-            xpx = float(x_pc_to_px(v))
-            ax.plot([xpx, xpx],
-                    [y_offset + eff_h, y_offset + eff_h + 4],
-                    color=_AXIS_COLOR, linewidth=0.6, zorder=1)
-            ax.text(xpx, y_offset + eff_h + 18, f"{v:g}",
-                    ha="center", va="top", color=_AXIS_COLOR,
-                    fontsize=18 * font_scale, family="Helvetica")
-    for v in yt_pc:
-        if payload["ylim"][0] <= v <= payload["ylim"][1]:
-            ypx = float(y_pc_to_px(v))
-            ax.plot([x_offset - 4, x_offset], [ypx, ypx],
-                    color=_AXIS_COLOR, linewidth=0.6, zorder=1)
-            ax.text(x_offset - 9, ypx, f"{v:g}",
-                    ha="right", va="center", color=_AXIS_COLOR,
-                    fontsize=18 * font_scale, family="Helvetica")
+    # PC coordinates are not interpretable units for the reader, so no tick
+    # marks or tick numbers are drawn — the two axis lines + "PC1"/"PC2"
+    # suffice to orient the viewer.
 
     if show_axes_labels:
-        ax.text(x_offset + eff_w / 2.0, y_offset + eff_h + 52,
+        ax.text(x_offset + eff_w / 2.0, y_offset + eff_h + 42,
                 "PC1",
                 ha="center", va="center", color="#555",
-                fontsize=22 * font_scale, fontweight=600, family="Helvetica")
-        ax.text(x_offset - 54, y_offset + eff_h / 2.0,
+                fontsize=38 * font_scale, fontweight=600, family="Helvetica")
+        ax.text(x_offset - 42, y_offset + eff_h / 2.0,
                 "PC2",
                 ha="center", va="center", color="#555",
-                fontsize=22 * font_scale, fontweight=600, family="Helvetica",
+                fontsize=38 * font_scale, fontweight=600, family="Helvetica",
                 rotation=90)
 
     # Contours (filled HPD polygons), outer level first so inner levels
@@ -2371,7 +2366,7 @@ def render_payload_to_ax(ax,
                 ax.plot(
                     [m["label_x"], float(x_pc_to_px(c["center_pc1"]))],
                     [m["label_y"], float(y_pc_to_px(c["center_pc2"]))],
-                    color="#8ab4d8", linewidth=2.0, alpha=0.75,
+                    color="black", linewidth=1.5, alpha=0.85,
                     linestyle=(0, (6, 4)), zorder=6,
                 )
 
@@ -2393,9 +2388,12 @@ def render_payload_to_ax(ax,
             wrapped = _wrap_two_lines(ci["label"])
             text = f"{wrapped}\n{ci['posterior_mass']:.2f}"
             fs = _cluster_label_fontsize(ci["coef_abs_contrib"], ref_local)
+            override = (label_color_map or {}).get(ci.get("label"))
+            text_color = (_darken_hex(override, 0.15)
+                          if override else _CLUSTER_TEXT)
             ax.text(ci["label_x"], ci["label_y"], text,
                     ha="center", va="center",
-                    color=_CLUSTER_TEXT,
+                    color=text_color,
                     fontsize=fs * font_scale, fontweight=700,
                     family="Helvetica", zorder=7)
 
@@ -2411,7 +2409,7 @@ def render_payload_to_ax(ax,
                     _wrap_two_lines(_short_label(ci["concept"])),
                     ha="center", va="center",
                     color="#2b2b2b",
-                    fontsize=15 * font_scale, fontweight=700,
+                    fontsize=22 * font_scale, fontweight=700,
                     family="Helvetica", zorder=6)
 
     if show_title:
@@ -2419,10 +2417,11 @@ def render_payload_to_ax(ax,
         # grid (set_title lives outside ylim). Match cluster-label font size
         # so axis titles have the same visual weight as the cluster callouts.
         title = _AXIS_DISPLAY.get(payload["axis"], payload["axis"])
-        ax.text(x_offset, -_MARGIN["top"] + 20,
+        ax.text(x_offset + eff_w / 2.0, -_MARGIN["top"] + 20,
                 title,
-                ha="left", va="top",
-                fontsize=24 * font_scale, fontweight=700,
+                ha="center", va="top",
+                fontsize=46 * font_scale, fontweight=700,
+                fontstyle="italic",
                 family="Helvetica", color="#1a1a1a", zorder=8)
 
 

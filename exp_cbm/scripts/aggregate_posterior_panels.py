@@ -28,6 +28,52 @@ import vis_posterior_d3 as vp  # noqa: E402
 from src.training_history import TrainingHistory  # noqa: E402
 
 
+# Qualitative palette for cross-panel cluster colors. Bright, saturated primaries
+# chosen to read clearly as text on white and to maximize cross-panel distinction.
+# Assigned deterministically in alphabetical label order so a given label gets
+# the same color across runs regardless of which panel we loaded first.
+_SHARED_CLUSTER_PALETTE = (
+    "#e41a1c",  # red
+    "#377eb8",  # blue
+    "#4daf4a",  # green
+    "#984ea3",  # purple
+    "#ff7f00",  # orange
+    "#a65628",  # brown
+    "#f781bf",  # pink
+    "#1a9999",  # teal
+)
+
+
+def _build_label_color_map(payloads: list, panel_k) -> dict:
+    """Return {label: color} for cluster/merge labels that appear in ≥2 panels.
+
+    Scans each payload's cluster + merge labels (using the same k the renderer
+    would). Only visible, repeated labels get a color — singletons stay the
+    default blue so colored labels really do signal cross-panel recurrence.
+    Assignment is alphabetical for stability across runs.
+    """
+    label_panels: dict[str, set[str]] = {}
+    for pl in payloads:
+        k = panel_k
+        if k is None:
+            saved = pl.get("saved_positions") or {}
+            k = int(saved.get("current_k", pl["default_k"]))
+        k = int(max(pl["k_min"], min(pl["k_max"], k)))
+        axis = pl["axis"]
+        for ci in vp._resolve_all_cluster_labels(pl, k):
+            if not ci.get("visible"):
+                continue
+            lbl = ci.get("label")
+            if not lbl:
+                continue
+            label_panels.setdefault(lbl, set()).add(axis)
+
+    shared = sorted(lbl for lbl, axes in label_panels.items()
+                    if len(axes) >= 2)
+    return {lbl: _SHARED_CLUSTER_PALETTE[i % len(_SHARED_CLUSTER_PALETTE)]
+            for i, lbl in enumerate(shared)}
+
+
 def _load_payload(training_history_file: str,
                   axis_name: str,
                   args) -> dict:
@@ -139,6 +185,12 @@ def main():
         print(f"[{i+1}/5] loading {axis_name} from {th_file}")
         payloads.append(_load_payload(th_file, axis_name, args))
 
+    label_color_map = _build_label_color_map(payloads, args.panel_k)
+    if label_color_map:
+        print("shared cluster colors across panels:")
+        for lbl, color in label_color_map.items():
+            print(f"  {lbl!r} → {color}")
+
     for i, pl in enumerate(payloads):
         print(f"[{i+1}/5] rendering {pl['axis']}")
         vp.render_payload_to_ax(
@@ -148,6 +200,7 @@ def main():
             show_title=True,
             show_axes_labels=True,
             coef_abs_ref=None,
+            label_color_map=label_color_map,
         )
 
     flat[5].set_axis_off()
