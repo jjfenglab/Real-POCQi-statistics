@@ -1,0 +1,224 @@
+{
+  "concept_labels": [
+    {
+      "concept": "Does Answer B discuss adverse effects more than Answer A?",
+      "labelX": 606,
+      "labelY": 602,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give a longer, more detailed response than Answer A?",
+      "labelX": 250,
+      "labelY": 202,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B report more quantitative data or outcome results than Answer A?",
+      "labelX": 448,
+      "labelY": 340,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite named studies or trials more than Answer A?",
+      "labelX": 1009,
+      "labelY": 252,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B present more quantitative evidence (numbers, effect sizes, statistics) than Answer A?",
+      "labelX": 474,
+      "labelY": 312,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give numeric thresholds or specific cutoffs more than Answer A?",
+      "labelX": 352,
+      "labelY": 150,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite named guidelines or studies more than Answer A?",
+      "labelX": 971,
+      "labelY": 138,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B hedge or qualify its recommendation more than Answer A?",
+      "labelX": 548,
+      "labelY": 183,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B present its content in tables or itemized/structured format more than Answer A?",
+      "labelX": 490,
+      "labelY": 39,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B recommend more diagnostic workup than Answer A?",
+      "labelX": 298,
+      "labelY": 486,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B target a clinician audience more than Answer A?",
+      "labelX": 587,
+      "labelY": 797,
+      "visible": false
+    },
+    {
+      "concept": "Is Answer B longer than Answer A?",
+      "labelX": 289,
+      "labelY": 47,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite named guidelines, studies, or society sources more than Answer A?",
+      "labelX": 975,
+      "labelY": 204,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more actionable guidance than Answer A?",
+      "labelX": 399,
+      "labelY": 315,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B address the clinician audience directly and stay focused more than Answer A?",
+      "labelX": 528,
+      "labelY": 723,
+      "visible": false
+    }
+  ],
+  "cluster_labels": {
+    "4": [
+      {
+        "cluster_id": 0,
+        "label": "Cluster A",
+        "labelX": 470,
+        "labelY": 283,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Cluster B",
+        "labelX": 558,
+        "labelY": 611,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Cluster C",
+        "labelX": 987,
+        "labelY": 227,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Cluster D",
+        "labelX": 314,
+        "labelY": 164,
+        "visible": true
+      }
+    ],
+    "5": [
+      {
+        "cluster_id": 0,
+        "label": "Cluster A",
+        "labelX": 987,
+        "labelY": 227,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Cluster B",
+        "labelX": 558,
+        "labelY": 611,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Cluster C",
+        "labelX": 338,
+        "labelY": 75,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Cluster D",
+        "labelX": 287,
+        "labelY": 215,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Cluster E",
+        "labelX": 458,
+        "labelY": 283,
+        "visible": true
+      }
+    ],
+    "6": [
+      {
+        "cluster_id": 0,
+        "label": "Guidelines & References",
+        "labelX": 896,
+        "labelY": 289,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Safety & Risks",
+        "labelX": 594,
+        "labelY": 560,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Cluster C",
+        "labelX": 338,
+        "labelY": 75,
+        "visible": false
+      },
+      {
+        "cluster_id": 3,
+        "label": "Answer Length",
+        "labelX": 333,
+        "labelY": 211,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Cluster E",
+        "labelX": 449,
+        "labelY": 288,
+        "visible": false
+      },
+      {
+        "cluster_id": 5,
+        "label": "Clinician Audience",
+        "labelX": 643,
+        "labelY": 718,
+        "visible": true
+      }
+    ]
+  },
+  "cluster_merges": {
+    "6": [
+      {
+        "id": "m_daao36ov",
+        "cluster_ids": [
+          2,
+          4
+        ],
+        "label": "Quantitative Evidence",
+        "labelX": 645,
+        "labelY": 204,
+        "visible": true
+      }
+    ]
+  },
+  "current_k": 6,
+  "ovals": []
+}

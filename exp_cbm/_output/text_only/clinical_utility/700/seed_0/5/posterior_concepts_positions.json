@@ -1,0 +1,473 @@
+{
+  "concept_labels": [
+    {
+      "concept": "Does Answer B give more diagnostic workup detail than Answer A?",
+      "labelX": 651,
+      "labelY": 291,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B use itemized lists or bulleted structure more than Answer A?",
+      "labelX": 403,
+      "labelY": 714,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite named clinical guidelines more than Answer A?",
+      "labelX": 992,
+      "labelY": 678,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B provide more quantitative evidence (numbers, statistics, or effect sizes) than Answer A?",
+      "labelX": 484,
+      "labelY": 368,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more mechanistic or pathophysiologic reasoning than Answer A?",
+      "labelX": 356,
+      "labelY": 147,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more mechanistic reasoning (explaining underlying biological or physiological mechanisms) than Answer A?",
+      "labelX": 349,
+      "labelY": 177,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B target a clinician audience more than Answer A?",
+      "labelX": 804,
+      "labelY": 359,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B present information in structured formats such as tables or itemized lists more than Answer A?",
+      "labelX": 413,
+      "labelY": 787,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B target a lay or patient audience more than Answer A?",
+      "labelX": 700,
+      "labelY": 423,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more quantitative thresholds or numeric values than Answer A?",
+      "labelX": 306,
+      "labelY": 368,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more quantitative detail (numbers, rates, thresholds) than Answer A?",
+      "labelX": 371,
+      "labelY": 475,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more mechanistic reasoning than Answer A?",
+      "labelX": 264,
+      "labelY": 174,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more actionable next steps than Answer A?",
+      "labelX": 282,
+      "labelY": 278,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B use structured formatting (lists, tables, or headers) more than Answer A?",
+      "labelX": 493,
+      "labelY": 770,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give a more definitive, actionable recommendation than Answer A?",
+      "labelX": 462,
+      "labelY": 395,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B explain underlying mechanisms or give more mechanistic reasoning than Answer A?",
+      "labelX": 241,
+      "labelY": 254,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B explain underlying mechanisms more than Answer A?",
+      "labelX": 385,
+      "labelY": 203,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B discuss safety risks, adverse effects, or contraindications more than Answer A?",
+      "labelX": 969,
+      "labelY": 130,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B discuss adverse effects and contraindications more than Answer A?",
+      "labelX": 1031,
+      "labelY": 104,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B describe adverse effects and contraindications more than Answer A?",
+      "labelX": 976,
+      "labelY": 7,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cover a broader scope of clinical considerations than Answer A?",
+      "labelX": 792,
+      "labelY": 385,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite named sources, guidelines, or studies more than Answer A?",
+      "labelX": 803,
+      "labelY": 757,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite named guidelines or studies more than Answer A?",
+      "labelX": 763,
+      "labelY": 721,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B provide more quantitative or numeric evidence than Answer A?",
+      "labelX": 405,
+      "labelY": 458,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite more named clinical guidelines than Answer A?",
+      "labelX": 1018,
+      "labelY": 563,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B include more quantitative or numeric detail (rates, thresholds, doses) than Answer A?",
+      "labelX": 540,
+      "labelY": 399,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more actionable guidance or next steps than Answer A?",
+      "labelX": 481,
+      "labelY": 315,
+      "visible": false
+    },
+    {
+      "concept": "Is Answer B written more directly for a clinician audience than Answer A?",
+      "labelX": 755,
+      "labelY": 411,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B state contraindications, adverse effects, or safety warnings more than Answer A?",
+      "labelX": 1028,
+      "labelY": 182,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more numeric thresholds for action (specific cutoff values) than Answer A?",
+      "labelX": 406,
+      "labelY": 306,
+      "visible": false
+    }
+  ],
+  "cluster_labels": {
+    "4": [
+      {
+        "cluster_id": 0,
+        "label": "Structured Format",
+        "labelX": 447,
+        "labelY": 715
+      },
+      {
+        "cluster_id": 1,
+        "label": "Actionable Guidance",
+        "labelX": 427,
+        "labelY": 276
+      },
+      {
+        "cluster_id": 2,
+        "label": "Quantitative Evidence",
+        "labelX": 398,
+        "labelY": 451
+      },
+      {
+        "cluster_id": 3,
+        "label": "Mechanism",
+        "labelX": 384,
+        "labelY": 176
+      }
+    ],
+    "5": [
+      {
+        "cluster_id": 0,
+        "label": "Actionable Guidance",
+        "labelX": 363,
+        "labelY": 277
+      },
+      {
+        "cluster_id": 1,
+        "label": "Quantitative Evidence",
+        "labelX": 902,
+        "labelY": 658
+      },
+      {
+        "cluster_id": 2,
+        "label": "Structured Format",
+        "labelX": 1003,
+        "labelY": 72
+      },
+      {
+        "cluster_id": 3,
+        "label": "Mechanism",
+        "labelX": 680,
+        "labelY": 338
+      },
+      {
+        "cluster_id": 4,
+        "label": "Cluster E",
+        "labelX": 440,
+        "labelY": 729
+      }
+    ],
+    "6": [
+      {
+        "cluster_id": 0,
+        "label": "Actionable Guidance",
+        "labelX": 363,
+        "labelY": 277
+      },
+      {
+        "cluster_id": 1,
+        "label": "Quantitative Evidence",
+        "labelX": 779,
+        "labelY": 736
+      },
+      {
+        "cluster_id": 2,
+        "label": "Structured Format",
+        "labelX": 1003,
+        "labelY": 72
+      },
+      {
+        "cluster_id": 3,
+        "label": "Mechanism",
+        "labelX": 680,
+        "labelY": 338
+      },
+      {
+        "cluster_id": 4,
+        "label": "Quantitative Evidence",
+        "labelX": 440,
+        "labelY": 729
+      },
+      {
+        "cluster_id": 5,
+        "label": "Mechanism",
+        "labelX": 989,
+        "labelY": 602
+      }
+    ],
+    "7": [
+      {
+        "cluster_id": 0,
+        "label": "Quantative Guidance",
+        "labelX": 394,
+        "labelY": 345,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Mechanism",
+        "labelX": 766,
+        "labelY": 388,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Quantitative Evidence",
+        "labelX": 440,
+        "labelY": 729,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Safety & Risks",
+        "labelX": 1018,
+        "labelY": 18,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Mechanism",
+        "labelX": 925,
+        "labelY": 686,
+        "visible": true
+      },
+      {
+        "cluster_id": 5,
+        "label": "Actionable Guidance",
+        "labelX": 556,
+        "labelY": 280,
+        "visible": true
+      },
+      {
+        "cluster_id": 6,
+        "label": "Mechanism",
+        "labelX": 357,
+        "labelY": 70,
+        "visible": true
+      }
+    ],
+    "8": [
+      {
+        "cluster_id": 0,
+        "label": "Mechanism",
+        "labelX": 316,
+        "labelY": 178,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Clinician Audience",
+        "labelX": 726,
+        "labelY": 437,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Safety & Risks",
+        "labelX": 907,
+        "labelY": 136,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Structured Format",
+        "labelX": 989,
+        "labelY": 602,
+        "visible": false
+      },
+      {
+        "cluster_id": 4,
+        "label": "Clinical Guidelines",
+        "labelX": 779,
+        "labelY": 736,
+        "visible": false
+      },
+      {
+        "cluster_id": 5,
+        "label": "Structured Format",
+        "labelX": 419,
+        "labelY": 670,
+        "visible": true
+      },
+      {
+        "cluster_id": 6,
+        "label": "Actionable Guidance",
+        "labelX": 555,
+        "labelY": 255,
+        "visible": true
+      },
+      {
+        "cluster_id": 7,
+        "label": "Quantitative Evidence",
+        "labelX": 428,
+        "labelY": 407,
+        "visible": true
+      }
+    ],
+    "9": [
+      {
+        "cluster_id": 0,
+        "label": "Actionable Guidance",
+        "labelX": 477,
+        "labelY": 298,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Actionable Guidance",
+        "labelX": 570,
+        "labelY": 403,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Structured Format",
+        "labelX": 1003,
+        "labelY": 72,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Quantitative Evidence",
+        "labelX": 440,
+        "labelY": 729,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Mechanism",
+        "labelX": 989,
+        "labelY": 602,
+        "visible": true
+      },
+      {
+        "cluster_id": 5,
+        "label": "Quantative Guidance",
+        "labelX": 375,
+        "labelY": 363,
+        "visible": true
+      },
+      {
+        "cluster_id": 6,
+        "label": "Mechanism",
+        "labelX": 378,
+        "labelY": 187,
+        "visible": true
+      },
+      {
+        "cluster_id": 7,
+        "label": "Quantitative Evidence",
+        "labelX": 779,
+        "labelY": 736,
+        "visible": true
+      },
+      {
+        "cluster_id": 8,
+        "label": "Mechanism",
+        "labelX": 820,
+        "labelY": 357,
+        "visible": true
+      }
+    ]
+  },
+  "cluster_merges": {
+    "8": [
+      {
+        "id": "m_v6b865k3",
+        "cluster_ids": [
+          3,
+          4
+        ],
+        "label": "Guidelines & References",
+        "labelX": 802,
+        "labelY": 623,
+        "visible": true
+      }
+    ]
+  },
+  "current_k": 8,
+  "ovals": []
+}

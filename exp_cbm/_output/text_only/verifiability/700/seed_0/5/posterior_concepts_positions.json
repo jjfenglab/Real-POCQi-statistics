@@ -1,0 +1,302 @@
+{
+  "concept_labels": [
+    {
+      "concept": "Does Answer B stay more narrowly focused on the question asked than Answer A?",
+      "labelX": 411,
+      "labelY": 609,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B present more quantitative evidence (numbers, effect sizes, statistics) than Answer A?",
+      "labelX": 646,
+      "labelY": 639,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite named primary studies more than Answer A?",
+      "labelX": 1100,
+      "labelY": 686,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B include more risk-aware caveats or safety framing than Answer A?",
+      "labelX": 258,
+      "labelY": 98,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give a narrower, more focused scope than Answer A?",
+      "labelX": 369,
+      "labelY": 654,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B target a clinician audience more than Answer A?",
+      "labelX": 736,
+      "labelY": 115,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B report more quantitative data (numbers, statistics, or prevalence figures) than Answer A?",
+      "labelX": 764,
+      "labelY": 463,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B use step-by-step reasoning more than Answer A?",
+      "labelX": 250,
+      "labelY": 808,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B include more safety caveats and risk warnings than Answer A?",
+      "labelX": 278,
+      "labelY": 74,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B address a specific patient audience more than Answer A?",
+      "labelX": 626,
+      "labelY": 115,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B acknowledge its own limitations or uncertainty more than Answer A?",
+      "labelX": 322,
+      "labelY": 616,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B end with a follow-up offer or offer of further help more than Answer A?",
+      "labelX": 308,
+      "labelY": 571,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B describe adverse effects of treatment more thoroughly than Answer A?",
+      "labelX": 665,
+      "labelY": 314,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite specific named studies or guidelines more than Answer A?",
+      "labelX": 1087,
+      "labelY": 543,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give a ranked or prioritized differential diagnosis more than Answer A?",
+      "labelX": 528,
+      "labelY": 241,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite named clinical guidelines more than Answer A?",
+      "labelX": 958,
+      "labelY": 306,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite more named studies or guidelines than Answer A?",
+      "labelX": 1070,
+      "labelY": 529,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B include more safety caveats or warnings than Answer A?",
+      "labelX": 147,
+      "labelY": 98,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B include more unsourced or undated claims than Answer A?",
+      "labelX": 555,
+      "labelY": 688,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more numeric thresholds or specific cutoffs than Answer A?",
+      "labelX": 375,
+      "labelY": 548,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more mechanistic reasoning than Answer A?",
+      "labelX": 268,
+      "labelY": 772,
+      "visible": false
+    },
+    {
+      "concept": "Is Answer B written for a clinician audience more than Answer A, rather than for patients?",
+      "labelX": 769,
+      "labelY": 50,
+      "visible": false
+    }
+  ],
+  "cluster_labels": {
+    "4": [
+      {
+        "cluster_id": 0,
+        "label": "Cluster A",
+        "labelX": 358,
+        "labelY": 621,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Cluster B",
+        "labelX": 526,
+        "labelY": 139,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Cluster C",
+        "labelX": 719,
+        "labelY": 592,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Cluster D",
+        "labelX": 1067,
+        "labelY": 573,
+        "visible": true
+      }
+    ],
+    "5": [
+      {
+        "cluster_id": 0,
+        "label": "Quantitative Evidence",
+        "labelX": 719,
+        "labelY": 592,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Mechanism",
+        "labelX": 358,
+        "labelY": 621,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Guidelines & References",
+        "labelX": 1067,
+        "labelY": 573,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Quantitative Evidence",
+        "labelX": 707,
+        "labelY": 163,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Safety & Risks",
+        "labelX": 224,
+        "labelY": 98,
+        "visible": true
+      }
+    ],
+    "6": [
+      {
+        "cluster_id": 0,
+        "label": "Comprehensive Coverage",
+        "labelX": 404,
+        "labelY": 549,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Mechanism",
+        "labelX": 336,
+        "labelY": 729,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Guidelines & References",
+        "labelX": 1134,
+        "labelY": 561,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Misc",
+        "labelX": 751,
+        "labelY": 177,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Safety & Risks",
+        "labelX": 261,
+        "labelY": 44,
+        "visible": true
+      },
+      {
+        "cluster_id": 5,
+        "label": "Quantitative Evidence",
+        "labelX": 719,
+        "labelY": 592,
+        "visible": true
+      }
+    ],
+    "7": [
+      {
+        "cluster_id": 0,
+        "label": "Comprehensive Coverage",
+        "labelX": 442,
+        "labelY": 627,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Mechanism",
+        "labelX": 281,
+        "labelY": 735,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Guidelines & References",
+        "labelX": 1067,
+        "labelY": 573,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Quantitative Evidence",
+        "labelX": 707,
+        "labelY": 163,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Safety & Risks",
+        "labelX": 333,
+        "labelY": 582,
+        "visible": true
+      },
+      {
+        "cluster_id": 5,
+        "label": "Quantitative Evidence",
+        "labelX": 719,
+        "labelY": 592,
+        "visible": true
+      },
+      {
+        "cluster_id": 6,
+        "label": "Safety & Risks",
+        "labelX": 224,
+        "labelY": 98,
+        "visible": true
+      }
+    ]
+  },
+  "current_k": 6,
+  "ovals": []
+}

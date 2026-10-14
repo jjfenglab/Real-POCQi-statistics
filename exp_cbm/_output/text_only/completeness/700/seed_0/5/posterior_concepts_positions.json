@@ -1,0 +1,358 @@
+{
+  "concept_labels": [
+    {
+      "concept": "Does Answer B cite named studies or guidelines more than Answer A?",
+      "labelX": 834,
+      "labelY": 329,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B explain underlying mechanisms more than Answer A?",
+      "labelX": 606,
+      "labelY": 637,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B include more safety caveats or warnings than Answer A?",
+      "labelX": 1014,
+      "labelY": 544,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B use more itemized or bulleted lists than Answer A?",
+      "labelX": 315,
+      "labelY": 239,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B discuss risks, adverse effects, or safety caveats more than Answer A?",
+      "labelX": 1097,
+      "labelY": 294,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B acknowledge limitations or caveats more than Answer A?",
+      "labelX": 835,
+      "labelY": 704,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B use more structured formatting (tables, section headers, itemized lists) than Answer A?",
+      "labelX": 133,
+      "labelY": 8,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B tailor its content to a specific patient population more than Answer A?",
+      "labelX": 876,
+      "labelY": 277,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B stratify risk by patient subgroup more than Answer A?",
+      "labelX": 1180,
+      "labelY": 172,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B provide more quantitative evidence than Answer A?",
+      "labelX": 656,
+      "labelY": 568,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more definitive, actionable recommendations than Answer A?",
+      "labelX": 792,
+      "labelY": 667,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more actionable management guidance than Answer A?",
+      "labelX": 791,
+      "labelY": 467,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give a longer response than Answer A?",
+      "labelX": 546,
+      "labelY": 789,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cover more aspects of the question (comprehensive coverage) than Answer A?",
+      "labelX": 831,
+      "labelY": 290,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cover a broader scope of clinical considerations than Answer A?",
+      "labelX": 1002,
+      "labelY": 140,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cover a broader scope of the clinical question than Answer A?",
+      "labelX": 981,
+      "labelY": 215,
+      "visible": false
+    },
+    {
+      "concept": "Is Answer B shorter than Answer A?",
+      "labelX": 560,
+      "labelY": 626,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B use more mechanistic reasoning than Answer A?",
+      "labelX": 496,
+      "labelY": 731,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B use structured formatting such as tables or sections more than Answer A?",
+      "labelX": 225,
+      "labelY": 106,
+      "visible": false
+    }
+  ],
+  "cluster_labels": {
+    "4": [
+      {
+        "cluster_id": 0,
+        "label": "Cluster A",
+        "labelX": 1110,
+        "labelY": 156,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Cluster B",
+        "labelX": 235,
+        "labelY": 176,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Cluster C",
+        "labelX": 814,
+        "labelY": 201,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Cluster D",
+        "labelX": 731,
+        "labelY": 606,
+        "visible": true
+      }
+    ],
+    "5": [
+      {
+        "cluster_id": 0,
+        "label": "Structured Format",
+        "labelX": 235,
+        "labelY": 176,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Comprehensive Coverage",
+        "labelX": 1048,
+        "labelY": 197,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Mechanism",
+        "labelX": 737,
+        "labelY": 630,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Comprehensive Coverage",
+        "labelX": 879,
+        "labelY": 306,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Safety & Risks",
+        "labelX": 1002,
+        "labelY": 424,
+        "visible": true
+      }
+    ],
+    "6": [
+      {
+        "cluster_id": 0,
+        "label": "Structured Format",
+        "labelX": 235,
+        "labelY": 176,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Comprehensive Coverage",
+        "labelX": 1048,
+        "labelY": 197,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Mechanism",
+        "labelX": 662,
+        "labelY": 649,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Actionable & Quantitative",
+        "labelX": 776,
+        "labelY": 495,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Safety & Risks",
+        "labelX": 1010,
+        "labelY": 475,
+        "visible": true
+      },
+      {
+        "cluster_id": 5,
+        "label": "Comprehensive Coverage",
+        "labelX": 781,
+        "labelY": 243,
+        "visible": true
+      }
+    ],
+    "7": [
+      {
+        "cluster_id": 0,
+        "label": "Safety & Risks",
+        "labelX": 1038,
+        "labelY": 470,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Comprehensive Coverage",
+        "labelX": 868,
+        "labelY": 208,
+        "visible": false
+      },
+      {
+        "cluster_id": 2,
+        "label": "Comprehensive Coverage",
+        "labelX": 1068,
+        "labelY": 138,
+        "visible": false
+      },
+      {
+        "cluster_id": 3,
+        "label": "Mechanism",
+        "labelX": 625,
+        "labelY": 637,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Answer Length",
+        "labelX": 528,
+        "labelY": 740,
+        "visible": true
+      },
+      {
+        "cluster_id": 5,
+        "label": "Structured Format",
+        "labelX": 235,
+        "labelY": 176,
+        "visible": true
+      },
+      {
+        "cluster_id": 6,
+        "label": "Comprehensive Coverage",
+        "labelX": 715,
+        "labelY": 461,
+        "visible": false
+      }
+    ],
+    "8": [
+      {
+        "cluster_id": 0,
+        "label": "Actionable & Quantitative",
+        "labelX": 792,
+        "labelY": 657,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Comprehensive Coverage",
+        "labelX": 784,
+        "labelY": 301,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Safety & Risks",
+        "labelX": 1048,
+        "labelY": 197,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Mechanism",
+        "labelX": 642,
+        "labelY": 651,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Answer Length",
+        "labelX": 560,
+        "labelY": 706,
+        "visible": true
+      },
+      {
+        "cluster_id": 5,
+        "label": "Cluster F",
+        "labelX": 235,
+        "labelY": 176,
+        "visible": true
+      },
+      {
+        "cluster_id": 6,
+        "label": "Cluster G",
+        "labelX": 750,
+        "labelY": 554,
+        "visible": true
+      },
+      {
+        "cluster_id": 7,
+        "label": "Cluster H",
+        "labelX": 1010,
+        "labelY": 475,
+        "visible": true
+      }
+    ]
+  },
+  "cluster_merges": {
+    "7": [
+      {
+        "id": "m_4v9ifsod",
+        "cluster_ids": [
+          1,
+          2,
+          6
+        ],
+        "label": "Comprehensive Coverage",
+        "labelX": 673,
+        "labelY": 208,
+        "visible": true
+      }
+    ]
+  },
+  "current_k": 7,
+  "ovals": []
+}

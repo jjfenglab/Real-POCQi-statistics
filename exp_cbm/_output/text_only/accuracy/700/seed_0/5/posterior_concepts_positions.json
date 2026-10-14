@@ -1,0 +1,278 @@
+{
+  "concept_labels": [
+    {
+      "concept": "Does Answer B report more quantitative evidence or numeric detail than Answer A?",
+      "labelX": 642,
+      "labelY": 267,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B differentiate risk by subgroup or population more than Answer A?",
+      "labelX": 415,
+      "labelY": 93,
+      "visible": false
+    },
+    {
+      "concept": "Is Answer B more focused and on-topic (less tangential) than Answer A?",
+      "labelX": 429,
+      "labelY": 607,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite more named guidelines or named studies than Answer A?",
+      "labelX": 943,
+      "labelY": 416,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B target a more specialist or clinician-level audience than Answer A?",
+      "labelX": 435,
+      "labelY": 258,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B tailor its framing to a specific audience (clinician or patient) more than Answer A?",
+      "labelX": 569,
+      "labelY": 385,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B stay more tightly focused on the question, without tangential expansion, than Answer A?",
+      "labelX": 262,
+      "labelY": 715,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B provide more quantitative evidence than Answer A?",
+      "labelX": 550,
+      "labelY": 356,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B provide more comprehensive coverage of the topic than Answer A?",
+      "labelX": 561,
+      "labelY": 345,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B include more safety warnings or monitoring considerations than Answer A?",
+      "labelX": 292,
+      "labelY": 37,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B include a stepwise, step-by-step reasoning or workup plan than Answer A?",
+      "labelX": 313,
+      "labelY": 557,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B acknowledge limitations or uncertainty more than Answer A?",
+      "labelX": 387,
+      "labelY": 361,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give a longer, more elaborated response than Answer A?",
+      "labelX": 297,
+      "labelY": 654,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B explain underlying mechanisms or step-by-step reasoning more than Answer A?",
+      "labelX": 396,
+      "labelY": 552,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B explain underlying mechanisms more than Answer A?",
+      "labelX": 370,
+      "labelY": 493,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B end with an offer of further help or follow-up more than Answer A?",
+      "labelX": 254,
+      "labelY": 668,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite specific named studies or primary literature more than Answer A?",
+      "labelX": 1034,
+      "labelY": 505,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite quantitative evidence (numbers, rates, trial results) more than Answer A?",
+      "labelX": 777,
+      "labelY": 330,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B give more diagnostic workup or testing detail than Answer A?",
+      "labelX": 348,
+      "labelY": 266,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B stay more focused on the specific question, without tangential expansion, than Answer A?",
+      "labelX": 300,
+      "labelY": 714,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite named or attributed sources more than Answer A?",
+      "labelX": 880,
+      "labelY": 614,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B cite specific named studies, primary literature, or sources for its claims more than Answer A?",
+      "labelX": 1082,
+      "labelY": 522,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B include more safety caveats or monitoring guidance than Answer A?",
+      "labelX": 254,
+      "labelY": 106,
+      "visible": false
+    },
+    {
+      "concept": "Does Answer B end with a closing summary or bottom-line statement more than Answer A?",
+      "labelX": 358,
+      "labelY": 637,
+      "visible": false
+    }
+  ],
+  "cluster_labels": {
+    "4": [
+      {
+        "cluster_id": 0,
+        "label": "Comprehensive Coverage",
+        "labelX": 397,
+        "labelY": 728,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "References",
+        "labelX": 940,
+        "labelY": 508,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Quantitative",
+        "labelX": 614,
+        "labelY": 231,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Mechanistic Reasoning",
+        "labelX": 396,
+        "labelY": 475,
+        "visible": true
+      }
+    ],
+    "5": [
+      {
+        "cluster_id": 0,
+        "label": "Talk a lot",
+        "labelX": 578,
+        "labelY": 343,
+        "visible": true
+      },
+      {
+        "cluster_id": 1,
+        "label": "Step-by-step reasoning",
+        "labelX": 388,
+        "labelY": 562,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Comprehensive Coverage",
+        "labelX": 928,
+        "labelY": 458,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Quantitative",
+        "labelX": 587,
+        "labelY": 258,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "References",
+        "labelX": 404,
+        "labelY": 133,
+        "visible": true
+      }
+    ],
+    "6": [
+      {
+        "cluster_id": 0,
+        "label": "Quantitative",
+        "labelX": 630,
+        "labelY": 342,
+        "visible": false
+      },
+      {
+        "cluster_id": 1,
+        "label": "Safety & Risks",
+        "labelX": 311,
+        "labelY": 177,
+        "visible": true
+      },
+      {
+        "cluster_id": 2,
+        "label": "Specialized",
+        "labelX": 526,
+        "labelY": 133,
+        "visible": true
+      },
+      {
+        "cluster_id": 3,
+        "label": "Comprehensive Coverage",
+        "labelX": 395,
+        "labelY": 617,
+        "visible": true
+      },
+      {
+        "cluster_id": 4,
+        "label": "Guidelines & References",
+        "labelX": 802,
+        "labelY": 508,
+        "visible": true
+      },
+      {
+        "cluster_id": 5,
+        "label": "Quantitative",
+        "labelX": 656,
+        "labelY": 274,
+        "visible": false
+      }
+    ]
+  },
+  "cluster_merges": {
+    "6": [
+      {
+        "id": "m_gn60q6sd",
+        "cluster_ids": [
+          0,
+          5
+        ],
+        "label": "Quantitative Evidence",
+        "labelX": 781,
+        "labelY": 228,
+        "visible": true
+      }
+    ]
+  },
+  "current_k": 6,
+  "ovals": []
+}
